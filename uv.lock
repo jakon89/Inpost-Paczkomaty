@@ -866,7 +866,7 @@ wheels = [
 ]
 
 [[package]]
-name = "inpost-air"
+name = "inpost-paczkomaty"
 version = "1.6.1"
 source = { virtual = "." }
 dependencies = [
