@@ -18,7 +18,7 @@ class InpostDataCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"Inpost Paczkomaty data coordinator",
+            name="Inpost Paczkomaty data coordinator",
             update_interval=timedelta(seconds=30),
         )
         self.mailbay_api_client = mailbay_api_client

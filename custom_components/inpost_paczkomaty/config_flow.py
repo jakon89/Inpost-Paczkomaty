@@ -38,7 +38,7 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         existing_entries = self._async_current_entries()
         if len(existing_entries) > MAX_ENTRIES:
             return self.async_abort(
-                reason=f"max_entries"
+                reason="max_entries"
             )
 
         parcel_lockers = [
@@ -75,7 +75,7 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception as e:
                 _LOGGER.error("Cannot register HA instance: %s", e)
                 return self.async_abort(
-                    reason=f"cannot_register_ha_instance"
+                    reason="cannot_register_ha_instance"
                 )
 
         return self.async_show_form(

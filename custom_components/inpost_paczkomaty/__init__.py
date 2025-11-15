@@ -7,7 +7,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from custom_components.inpost_paczkomaty.coordinator import InpostDataCoordinator
-from .api import InPostParcelLocker, InPostApi, MailbayInpostApi
+from .api import MailbayInpostApi
 from .const import HA_ID_ENTRY_CONFIG
 
 _LOGGER = logging.getLogger(__name__)
