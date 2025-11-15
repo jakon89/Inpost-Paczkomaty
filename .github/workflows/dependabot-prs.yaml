@@ -1,0 +1,40 @@
+name: Dependabot Update
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  update-requirements:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@v2
+
+      - uses: actions/checkout@v5
+        if: ${{ steps.dependabot-metadata.outputs.package-ecosystem == 'pip' }}
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: astral-sh/setup-uv@v6
+        if: ${{ steps.dependabot-metadata.outputs.package-ecosystem == 'pip' }}
+
+      - name: Update dependencies
+        if: ${{ steps.dependabot-metadata.outputs.package-ecosystem == 'pip' }}
+        run: |
+          yq -i -o json ".requirements=$(yq -o json '.project.dependencies' pyproject.toml)" ./custom_components/inpost_paczkomaty/manifest.json
+
+      - name: Push updated version
+        uses: stefanzweifel/git-auto-commit-action@v6
+        if: ${{ steps.dependabot-metadata.outputs.package-ecosystem == 'pip' }}
+        with:
+          file_pattern: "./custom_components/inpost_paczkomaty/manifest.json"
+          commit_message: "chore(deps): update dependencies in manifest.json"
+          commit_user_name: dependabot[bot]
+          commit_user_email: 49699333+dependabot[bot]@users.noreply.github.com
