@@ -1,0 +1,23 @@
+{
+  "domain": "inpost_paczkomaty",
+  "name": "InPost Paczkomaty",
+  "codeowners": [
+    "@jakon89"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "recorder"
+  ],
+  "documentation": "https://github.com/jakon89/Inpost-Paczkomaty",
+  "homekit": {},
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jakon89/Inpost-Paczkomaty/issues",
+  "requirements": [
+    "dacite==1.9.2",
+    "python-slugify==8.0.4"
+  ],
+  "ssdp": [],
+  "version": "1.6.1",
+  "zeroconf": []
+}

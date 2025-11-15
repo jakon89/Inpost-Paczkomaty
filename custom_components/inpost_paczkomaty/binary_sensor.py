@@ -1,0 +1,32 @@
+import logging
+
+from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
+
+from .sensor import ParcelLockerDeviceSensor
+
+_LOGGER = logging.getLogger(__name__)
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    tracked_lockers = entry.options.get("lockers", [])
+    coordinator = entry.runtime_data
+
+    _LOGGER.debug("Creating binary sensors for lockers %s", tracked_lockers)
+
+    await coordinator.async_config_entry_first_refresh()
+
+    entities = []
+    for locker_id in tracked_lockers:
+        entities.append(ParcelLockerBinarySensor(coordinator, locker_id, "parcels_ready"))
+        entities.append(ParcelLockerBinarySensor(coordinator, locker_id, "parcels_en_route"))
+
+    async_add_entities(entities)
+
+class ParcelLockerBinarySensor(BinarySensorEntity, ParcelLockerDeviceSensor):
+    @property
+    def is_on(self) -> bool:
+        return bool(self._sensor_data)
+
+    @property
+    def device_class(self):
+        return BinarySensorDeviceClass.OCCUPANCY

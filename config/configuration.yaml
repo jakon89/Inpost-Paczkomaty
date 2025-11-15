@@ -1,0 +1,13 @@
+# https://www.home-assistant.io/integrations/default_config/
+default_config:
+
+# https://www.home-assistant.io/integrations/logger/
+logger:
+  default: info
+  logs:
+    custom_components.inpost_paczkomaty: debug
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - ::1
