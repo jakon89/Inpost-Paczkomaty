@@ -1,8 +1,20 @@
 {
-    "config": {
-        "abort": {
-            "max_entries": "Max 2 forwarding addresses can be configured",
-            "cannot_register_ha_instance": "Cannot obtain email forwarding addresses from Mailbay. Please report the issue."
+  "config": {
+    "abort": {
+      "max_entries": "Max 2 forwarding addresses can be configured",
+      "cannot_register_ha_instance": "Cannot obtain email forwarding addresses from Mailbay. Please report the issue."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "lockers": "Parcel Locker"
         }
+      },
+      "init": {
+        "data": {
+          "lockers": "Parcel Locker"
+        }
+      }
     }
+  }
 }

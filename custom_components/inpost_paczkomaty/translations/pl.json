@@ -1,8 +1,20 @@
 {
-    "config": {
-        "abort": {
-            "max_entries": "Maksymalnie 2 adresy email mogą być w użyciu.",
-            "cannot_register_ha_instance": "Nie można pobrać adresu email z mailbay.io. Proszę zgłosić nowe 'Issue' poprzez Github."
+  "config": {
+    "abort": {
+      "max_entries": "Maksymalnie 2 adresy email mogą być w użyciu.",
+      "cannot_register_ha_instance": "Nie można pobrać adresu email z mailbay.io. Proszę zgłosić błąd poprzez 'Issue' na Github."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "lockers": "Paczkomat"
         }
+      },
+      "init": {
+        "data": {
+          "lockers": "Paczkomat"
+        }
+      }
     }
+  }
 }
