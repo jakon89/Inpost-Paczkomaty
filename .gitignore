@@ -1,0 +1,5 @@
+.venv/
+bin/
+ha-local
+include/
+pyvenv.cfg
