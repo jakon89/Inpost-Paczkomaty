@@ -1,0 +1,7 @@
+.venv/
+bin/
+ha-local
+include/
+pyvenv.cfg
+.idea/
+lib/
