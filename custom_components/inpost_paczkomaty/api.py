@@ -10,9 +10,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from custom_components.inpost_paczkomaty.const import HA_ID_ENTRY_CONFIG, SECRET_ENTRY_CONFIG
-from custom_components.inpost_paczkomaty.models import InPostParcelLocker, MailbayHaInstanceLockersStatuses, \
-    MailbayHaInstance
+from custom_components.inpost_paczkomaty.const import (
+    HA_ID_ENTRY_CONFIG,
+    SECRET_ENTRY_CONFIG,
+)
+from custom_components.inpost_paczkomaty.models import (
+    InPostParcelLocker,
+    MailbayHaInstanceLockersStatuses,
+    MailbayHaInstance,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +29,7 @@ class ParcelLockerListResponse:
     page: int
     total_pages: int
     items: list[InPostParcelLocker]
+
 
 class MailbayInpostApi:
     BASE_URL = "http://localhost:4000"
@@ -37,28 +44,26 @@ class MailbayInpostApi:
     async def get_lockers_statuses(self) -> MailbayHaInstanceLockersStatuses:
         """Get parcel lockers list."""
         response = await self._request(
-            method="get", url=f"{self.BASE_URL}/api/ha_instance/{self._ha_id}?secret={self._secret}"
+            method="get",
+            url=f"{self.BASE_URL}/api/ha_instance/{self._ha_id}?secret={self._secret}",
         )
-        response_data = from_dict(MailbayHaInstanceLockersStatuses, await response.json())
+        response_data = from_dict(
+            MailbayHaInstanceLockersStatuses, await response.json()
+        )
 
         return response_data
 
-    async def register_ha_instance(
-        self, entry_id: str
-    ) -> MailbayHaInstance:
+    async def register_ha_instance(self, entry_id: str) -> MailbayHaInstance:
         response = await self._request(
             method="post",
             url=f"{self.BASE_URL}/api/ha_instance",
-            data={"ha_id": entry_id}
+            data={"ha_id": entry_id},
         )
 
         return from_dict(MailbayHaInstance, await response.json())
 
     async def _request(
-        self,
-        method: str,
-        url: str,
-        data: dict | None = None
+        self, method: str, url: str, data: dict | None = None
     ) -> ClientResponse:
         """Get information from the API."""
         try:
@@ -79,9 +84,7 @@ class MailbayInpostApi:
         except Exception as exception:  # pylint: disable=broad-except
             _LOGGER.warning("Unknown API error occurred: %s", exception)
 
-            raise ApiClientError(
-                "Something really wrong happened!"
-            ) from exception
+            raise ApiClientError("Something really wrong happened!") from exception
 
 
 class InPostApi:
@@ -112,9 +115,7 @@ class InPostApi:
             _LOGGER.warning("Request timed out")
             raise ApiClientError("Request timed out") from e
         except Exception as exception:  # pylint: disable=broad-except
-            raise ApiClientError(
-                "Something really wrong happened!"
-            ) from exception
+            raise ApiClientError("Something really wrong happened!") from exception
 
     async def get_parcel_lockers_list(self) -> list[InPostParcelLocker]:
         """Get parcel lockers list."""

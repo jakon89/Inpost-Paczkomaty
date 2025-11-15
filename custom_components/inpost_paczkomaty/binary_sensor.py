@@ -1,6 +1,9 @@
 import logging
 
-from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity,
+    BinarySensorDeviceClass,
+)
 
 from .sensor import ParcelLockerDeviceSensor
 
@@ -17,10 +20,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     for locker_id in tracked_lockers:
-        entities.append(ParcelLockerBinarySensor(coordinator, locker_id, "parcels_ready"))
-        entities.append(ParcelLockerBinarySensor(coordinator, locker_id, "parcels_en_route"))
+        entities.append(
+            ParcelLockerBinarySensor(coordinator, locker_id, "parcels_ready")
+        )
+        entities.append(
+            ParcelLockerBinarySensor(coordinator, locker_id, "parcels_en_route")
+        )
 
     async_add_entities(entities)
+
 
 class ParcelLockerBinarySensor(BinarySensorEntity, ParcelLockerDeviceSensor):
     @property

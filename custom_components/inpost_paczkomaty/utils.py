@@ -17,4 +17,3 @@ def haversine(lon1, lat1, lon2, lat2):
     km = 6371 * c
 
     return km
-

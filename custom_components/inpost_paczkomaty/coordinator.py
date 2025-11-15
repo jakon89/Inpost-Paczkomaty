@@ -11,9 +11,10 @@ from .api import MailbayInpostApi, MailbayHaInstanceLockersStatuses
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class InpostDataCoordinator(DataUpdateCoordinator):
     def __init__(
-            self, hass: HomeAssistant, mailbay_api_client: MailbayInpostApi
+        self, hass: HomeAssistant, mailbay_api_client: MailbayInpostApi
     ) -> None:
         super().__init__(
             hass,
@@ -26,7 +27,9 @@ class InpostDataCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         try:
             async with asyncio.timeout(10):
-                raw_data: MailbayHaInstanceLockersStatuses = await self.mailbay_api_client.get_lockers_statuses()
+                raw_data: MailbayHaInstanceLockersStatuses = (
+                    await self.mailbay_api_client.get_lockers_statuses()
+                )
 
                 en_route_by_locker = {}
                 ready_by_locker = {}
@@ -46,10 +49,11 @@ class InpostDataCoordinator(DataUpdateCoordinator):
                         "parcels_en_route": len(en_route) > 0,
                         "parcels_en_route_count": len(en_route),
                         "locker_id": locker_id,
-                        "locker_name": ready[0].locker.name if ready else (
-                            en_route[0].locker.name if en_route else locker_id),
-                        #Below elem is stored as extra_attributes in sensor so IT MUST be dict instead of list
-                        #see ParcelLockerJsonSensor at sensor.py
+                        "locker_name": ready[0].locker.name
+                        if ready
+                        else (en_route[0].locker.name if en_route else locker_id),
+                        # Below elem is stored as extra_attributes in sensor so IT MUST be dict instead of list
+                        # see ParcelLockerJsonSensor at sensor.py
                         "parcels_json": {
                             p.parcel_id: {
                                 "status": p.status,

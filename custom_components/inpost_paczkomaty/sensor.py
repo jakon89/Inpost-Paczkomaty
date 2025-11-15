@@ -19,13 +19,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     for locker_id in tracked_lockers:
-        entities.append(ParcelLockerNumericSensor(coordinator, locker_id, "parcels_ready_count"))
-        entities.append(ParcelLockerNumericSensor(coordinator, locker_id, "parcels_en_route_count"))
+        entities.append(
+            ParcelLockerNumericSensor(coordinator, locker_id, "parcels_ready_count")
+        )
+        entities.append(
+            ParcelLockerNumericSensor(coordinator, locker_id, "parcels_en_route_count")
+        )
         entities.append(ParcelLockerStringSensor(coordinator, locker_id, "locker_id"))
         entities.append(ParcelLockerStringSensor(coordinator, locker_id, "locker_name"))
         entities.append(ParcelLockerJsonSensor(coordinator, locker_id, "parcels_json"))
 
     async_add_entities(entities)
+
 
 class ParcelLockerDeviceSensor(CoordinatorEntity):
     """Base class for all parcel locker sensors."""
@@ -81,4 +86,3 @@ class ParcelLockerJsonSensor(ParcelLockerDeviceSensor, SensorEntity):
         """Return full JSON info for the locker."""
         data = self.coordinator.data.get(self._locker_id, {})
         return data.get("parcels_json", {})
-

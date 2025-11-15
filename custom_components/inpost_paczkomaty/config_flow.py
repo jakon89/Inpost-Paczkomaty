@@ -12,7 +12,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
-    SelectOptionDict, SelectSelectorMode,
+    SelectOptionDict,
+    SelectSelectorMode,
 )
 
 from . import MailbayInpostApi
@@ -37,9 +38,7 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         existing_entries = self._async_current_entries()
         if len(existing_entries) > MAX_ENTRIES:
-            return self.async_abort(
-                reason="max_entries"
-            )
+            return self.async_abort(reason="max_entries")
 
         parcel_lockers = [
             SimpleParcelLocker(
@@ -68,37 +67,47 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             mailbay_api_client = MailbayInpostApi(self.hass, None)
 
             try:
-                ha_instance_data = await mailbay_api_client.register_ha_instance(uuid.uuid4())
-                _LOGGER.info("Registered HA instance and updated config entry: %s", asdict(ha_instance_data))
+                ha_instance_data = await mailbay_api_client.register_ha_instance(
+                    uuid.uuid4()
+                )
+                _LOGGER.info(
+                    "Registered HA instance and updated config entry: %s",
+                    asdict(ha_instance_data),
+                )
 
-                return self.async_create_entry(title=f"Forwarding address: parcels@{ha_instance_data.domain}", data={**asdict(ha_instance_data)}, options=user_input)
+                return self.async_create_entry(
+                    title=f"Forwarding address: parcels@{ha_instance_data.domain}",
+                    data={**asdict(ha_instance_data)},
+                    options=user_input,
+                )
             except Exception as e:
                 _LOGGER.error("Cannot register HA instance: %s", e)
-                return self.async_abort(
-                    reason="cannot_register_ha_instance"
-                )
+                return self.async_abort(reason="cannot_register_ha_instance")
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required(
-                    "lockers",
-                    default=[],
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=options,
-                        multiple=True,
-                        custom_value=False,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        "lockers",
+                        default=[],
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options,
+                            multiple=True,
+                            custom_value=False,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                }
+            ),
         )
 
     @staticmethod
     @callback
     def async_get_options_flow(entry):
         return InPostAirOptionsFlow(entry)
+
 
 class InPostAirOptionsFlow(config_entries.OptionsFlow):
     """Allow user to pick which lockers they want to track."""
@@ -137,26 +146,26 @@ class InPostAirOptionsFlow(config_entries.OptionsFlow):
         current = self.entry.options.get("lockers", [])
 
         if user_input is not None:
-            self.hass.config_entries.async_update_entry(
-                self.entry, options=user_input
-            )
+            self.hass.config_entries.async_update_entry(self.entry, options=user_input)
             await self.hass.config_entries.async_reload(self.entry.entry_id)
 
             return self.async_create_entry(title="", data=user_input)
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Required(
-                    "lockers",
-                    default=current,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=options,
-                        multiple=True,
-                        custom_value=False,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        "lockers",
+                        default=current,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options,
+                            multiple=True,
+                            custom_value=False,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                }
+            ),
         )

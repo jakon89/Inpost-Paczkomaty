@@ -8,27 +8,34 @@ class MailbayHaInstance:
     secret: str
     domain: str
 
+
 @dataclass
 class Locker:
     """Represents a locker."""
+
     id: str
     name: str
+
 
 @dataclass
 class Parcel:
     """Represents a parcel currently en route (or available for pickup)."""
+
     status: str
     locker: Locker
     parcel_id: str
     status_description: str
     status_title: str
 
+
 @dataclass
 class MailbayHaInstanceLockersStatuses:
     """Represents the main tracking response object."""
+
     locker_counts: Dict[str, int]
     en_route: List[Parcel]
     ready_to_pickup: List[Parcel]
+
 
 @dataclass
 class InPostParcelLockerPointCoordinates:

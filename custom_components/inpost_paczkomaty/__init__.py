@@ -14,9 +14,12 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug("async_setup_entry for entry_id: %s", entry.entry_id)
-    _LOGGER.info("Starting Inpost Paczkomaty with ha_id: %s", entry.data.get(HA_ID_ENTRY_CONFIG))
+    _LOGGER.info(
+        "Starting Inpost Paczkomaty with ha_id: %s", entry.data.get(HA_ID_ENTRY_CONFIG)
+    )
 
     mailbay_api_client = MailbayInpostApi(hass, entry)
     coordinator = InpostDataCoordinator(hass, mailbay_api_client)
