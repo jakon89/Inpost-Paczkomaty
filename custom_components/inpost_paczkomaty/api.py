@@ -32,7 +32,7 @@ class ParcelLockerListResponse:
 
 
 class MailbayInpostApi:
-    BASE_URL = "http://localhost:4000"
+    BASE_URL = "https://inpost.mailbay.io"
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Init class."""
