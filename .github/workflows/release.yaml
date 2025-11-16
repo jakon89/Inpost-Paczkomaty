@@ -7,10 +7,6 @@ on:
                 default: true
                 type: boolean
 
-env:
-    REGISTRY: ghcr.io
-    IMAGE_NAME: ${{ github.repository }}
-
 jobs:
     release:
         name: Release
