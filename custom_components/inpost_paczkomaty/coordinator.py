@@ -38,7 +38,9 @@ class InpostDataCoordinator(DataUpdateCoordinator):
                 for parcel in raw_data.ready_to_pickup:
                     ready_by_locker.setdefault(parcel.locker.id, []).append(parcel)
 
-                all_locker_ids = list(set(en_route_by_locker.keys()) | set(ready_by_locker.keys()))
+                all_locker_ids = list(
+                    set(en_route_by_locker.keys()) | set(ready_by_locker.keys())
+                )
 
                 sensors_data = {}
                 for locker_id in all_locker_ids:
