@@ -41,9 +41,10 @@ This approach ensures your email remains private while allowing automated parcel
 ### Manual Installation
 
 1. Download the latest release.
-2. Unpack the release and copy the `custom_components/inpost_paczkomaty` directory into the `custom_components` folder of your Home Assistant installation.
+2. Unpack the release and copy the content of the `release.zip` into `custom_components/inpost_paczkomaty` directory of your Home Assistant installation.
 3. Restart Home Assistant.
 4. Go to **Integrations** and add the InPost Paczkomaty integration.
+5. Execute steps `5-7` from HACS installation method (above)
 
 ---
 
@@ -78,8 +79,13 @@ For each tracked parcel locker, the integration creates the following entities:
 }
 ```
 
+### Roadmap (in no particular order)
+- Support tracking parcels sent to a parcel locker that hasn't been configured yet
+- Expose phone number and access code via a Home Assistant entity or attribute
+- Add a `[LOCKER_ID]_deadline` entity to monitor pickup deadlines for each locker
+
 #### Disclaimers
 
 - Some parts of the codebase were *heavily* inspired aka copied from InPost-Air
 - [Mailbay](https://mailbay.io), the service providing the necessary backend, is owned by this integration author - [jakon89](https://github.com/jakon89)
-- The service is free for up to 500 emails per Home Assistant instance.
+- The service is free for up to 500 emails per month per Home Assistant instance.
