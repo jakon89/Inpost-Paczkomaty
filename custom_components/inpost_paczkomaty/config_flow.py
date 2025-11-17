@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from dataclasses import dataclass, asdict
 
 import voluptuous as vol
@@ -14,10 +13,12 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectOptionDict,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
 )
 
-from . import MailbayInpostApi
-from .const import DOMAIN, MAX_ENTRIES
+from . import CustomInpostApi
+from .const import DOMAIN, HA_ID_ENTRY_CONFIG, SECRET_ENTRY_CONFIG
 from .utils import haversine
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,15 +31,95 @@ class SimpleParcelLocker:
     distance: float
 
 
+USER_SCHEMA = vol.Schema(
+    {
+        vol.Required(
+            "phone_number",
+        ): TextSelector(TextSelectorConfig(type="text"))
+    }
+)
+
+CODE_SCHEMA = vol.Schema(
+    {
+        vol.Required(
+            "sms_code",
+        ): TextSelector(TextSelectorConfig(type="text"))
+    }
+)
+
+
 class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        from .api import InPostApi
+        errors: dict[str, str] = {}
 
-        existing_entries = self._async_current_entries()
-        if len(existing_entries) > MAX_ENTRIES:
-            return self.async_abort(reason="max_entries")
+        if user_input is not None:
+            phone_number = user_input["phone_number"]
+
+            if not phone_number.isdigit() or not (9 == len(phone_number)):
+                errors["base"] = "invalid_phone_format"
+            else:
+                mailbay_api_client = CustomInpostApi(self.hass, None)
+                try:
+                    ha_instance_data = await mailbay_api_client.register_ha_instance(
+                        phone_number
+                    )
+                    _LOGGER.info(
+                        "Registered HA instance and updated config entry: %s",
+                        asdict(ha_instance_data),
+                    )
+                    self._data = {
+                        "phone_number": phone_number,
+                        SECRET_ENTRY_CONFIG: ha_instance_data.secret,
+                        HA_ID_ENTRY_CONFIG: ha_instance_data.ha_id,
+                    }
+
+                    return await self.async_step_code()
+
+                except Exception as e:
+                    _LOGGER.error("Cannot register HA instance: %s", e)
+                    errors["base"] = "phone_unknown_server_error"
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=USER_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_code(self, user_input=None):
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                mailbay_api_client = CustomInpostApi(self.hass, None)
+
+                ha_instance_data = await mailbay_api_client.confirm_ha_instance(
+                    self._data["ha_id"], self._data["secret"], user_input["sms_code"]
+                )
+                _LOGGER.info(
+                    "Confirmed HA instance: %s",
+                    asdict(ha_instance_data),
+                )
+
+                return self.async_create_entry(
+                    title=f"Inpost: +48 {self._data['phone_number']}",
+                    data=self._data,
+                    options=user_input,
+                )
+
+            except Exception as e:
+                _LOGGER.error("Cannot confirm HA instance: %s", e)
+                errors["base"] = "invalid_code"
+
+        return self.async_show_form(
+            step_id="code",
+            data_schema=CODE_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_lockers(self, user_input=None):
+        from .api import InPostApi
 
         parcel_lockers = [
             SimpleParcelLocker(
@@ -54,7 +135,6 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             for locker in await InPostApi(self.hass).get_parcel_lockers_list()
         ]
 
-        # Build options for SelectSelector
         options = [
             SelectOptionDict(
                 label=f"{locker.code} [{locker.distance:.2f}km] ({locker.description})",
@@ -64,28 +144,14 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ]
 
         if user_input is not None:
-            mailbay_api_client = MailbayInpostApi(self.hass, None)
-
-            try:
-                ha_instance_data = await mailbay_api_client.register_ha_instance(
-                    uuid.uuid4()
-                )
-                _LOGGER.info(
-                    "Registered HA instance and updated config entry: %s",
-                    asdict(ha_instance_data),
-                )
-
-                return self.async_create_entry(
-                    title=f"Forwarding address: parcels@{ha_instance_data.domain}",
-                    data={**asdict(ha_instance_data)},
-                    options=user_input,
-                )
-            except Exception as e:
-                _LOGGER.error("Cannot register HA instance: %s", e)
-                return self.async_abort(reason="cannot_register_ha_instance")
+            return self.async_create_entry(
+                title=self._data["phone_number"],
+                data={},
+                options=user_input,
+            )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="lockers",
             data_schema=vol.Schema(
                 {
                     vol.Required(

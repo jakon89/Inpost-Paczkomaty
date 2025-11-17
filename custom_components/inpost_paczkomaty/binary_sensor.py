@@ -21,10 +21,22 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = []
     for locker_id in tracked_lockers:
         entities.append(
-            ParcelLockerBinarySensor(coordinator, locker_id, "parcels_ready")
+            ParcelLockerBinarySensor(
+                coordinator,
+                locker_id,
+                "en_route",
+                lambda data, locker_id: data.en_route.get(locker_id, {}).get("count", 0)
+                > 0,
+            )
         )
         entities.append(
-            ParcelLockerBinarySensor(coordinator, locker_id, "parcels_en_route")
+            ParcelLockerBinarySensor(
+                coordinator,
+                locker_id,
+                "ready_for_pickup_count",
+                lambda data, locker_id: data.en_route.get(locker_id, {}).get("count", 0)
+                > 0,
+            )
         )
 
     async_add_entities(entities)

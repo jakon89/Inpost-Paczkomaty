@@ -16,8 +16,8 @@ from custom_components.inpost_paczkomaty.const import (
 )
 from custom_components.inpost_paczkomaty.models import (
     InPostParcelLocker,
-    MailbayHaInstanceLockersStatuses,
-    MailbayHaInstance,
+    HaInstance,
+    ParcelsSummary,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class ParcelLockerListResponse:
     items: list[InPostParcelLocker]
 
 
-class MailbayInpostApi:
+class CustomInpostApi:
     BASE_URL = "https://inpost.mailbay.io"
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -41,26 +41,35 @@ class MailbayInpostApi:
         self._ha_id = data.get(HA_ID_ENTRY_CONFIG)
         self._secret = data.get(SECRET_ENTRY_CONFIG)
 
-    async def get_lockers_statuses(self) -> MailbayHaInstanceLockersStatuses:
+    async def get_parcels(self) -> ParcelsSummary:
         """Get parcel lockers list."""
         response = await self._request(
             method="get",
-            url=f"{self.BASE_URL}/api/ha_instance/{self._ha_id}?secret={self._secret}",
+            url=f"{self.BASE_URL}/api/ha_instance/{self._ha_id}/parcels?secret={self._secret}",
         )
-        response_data = from_dict(
-            MailbayHaInstanceLockersStatuses, await response.json()
-        )
+        response_data = from_dict(ParcelsSummary, await response.json())
 
         return response_data
 
-    async def register_ha_instance(self, entry_id: str) -> MailbayHaInstance:
+    async def confirm_ha_instance(
+        self, ha_id: str, secret: str, code: str
+    ) -> HaInstance:
+        response = await self._request(
+            method="put",
+            url=f"{self.BASE_URL}/api/ha_instance/{ha_id}?secret={secret}",
+            data={"code": code},
+        )
+
+        return from_dict(HaInstance, await response.json())
+
+    async def register_ha_instance(self, phone: str) -> HaInstance:
         response = await self._request(
             method="post",
             url=f"{self.BASE_URL}/api/ha_instance",
-            data={"ha_id": entry_id},
+            data={"phone": phone},
         )
 
-        return from_dict(MailbayHaInstance, await response.json())
+        return from_dict(HaInstance, await response.json())
 
     async def _request(
         self, method: str, url: str, data: dict | None = None

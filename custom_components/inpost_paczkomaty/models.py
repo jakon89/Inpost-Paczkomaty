@@ -3,38 +3,34 @@ from typing import Dict, List
 
 
 @dataclass
-class MailbayHaInstance:
+class HaInstance:
     ha_id: str
     secret: str
-    domain: str
+
+
+@dataclass
+class ParcelItem:
+    id: str
+    phone: str
+    code: str
+    status: str
+    status_desc: str
 
 
 @dataclass
 class Locker:
-    """Represents a locker."""
-
-    id: str
-    name: str
-
-
-@dataclass
-class Parcel:
-    """Represents a parcel currently en route (or available for pickup)."""
-
-    status: str
-    locker: Locker
-    parcel_id: str
-    status_description: str
-    status_title: str
+    locker_id: str
+    count: int
+    parcels: List[ParcelItem]
 
 
 @dataclass
-class MailbayHaInstanceLockersStatuses:
-    """Represents the main tracking response object."""
-
-    locker_counts: Dict[str, int]
-    en_route: List[Parcel]
-    ready_to_pickup: List[Parcel]
+class ParcelsSummary:
+    all_count: int
+    ready_for_pickup_count: int
+    en_route_count: int
+    ready_for_pickup: Dict[str, Locker]
+    en_route: Dict[str, Locker]
 
 
 @dataclass
