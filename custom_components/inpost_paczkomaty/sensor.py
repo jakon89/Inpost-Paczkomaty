@@ -31,8 +31,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 locker_id,
                 "en_route_count",
-                lambda data, locker_id: data.en_route.get(locker_id, {}).get(
-                    "count", 0
+                lambda data, locker_id: (
+                    getattr(data.en_route.get(locker_id), "count", 0)
+                    if data.en_route.get(locker_id) is not None
+                    else 0
                 ),
             )
         )
@@ -41,8 +43,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 coordinator,
                 locker_id,
                 "ready_for_pickup_count",
-                lambda data, locker_id: data.ready_for_pickup.get(locker_id, {}).get(
-                    "count", 0
+                lambda data, locker_id: (
+                    getattr(data.ready_for_pickup.get(locker_id), "count", 0)
+                    if data.en_route.get(locker_id) is not None
+                    else 0
                 ),
             )
         )

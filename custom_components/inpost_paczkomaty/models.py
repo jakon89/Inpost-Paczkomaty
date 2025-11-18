@@ -11,8 +11,8 @@ class HaInstance:
 @dataclass
 class ParcelItem:
     id: str
-    phone: str
-    code: str
+    phone: str | None
+    code: str | None
     status: str
     status_desc: str
 
