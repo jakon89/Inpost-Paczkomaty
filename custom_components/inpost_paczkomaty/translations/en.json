@@ -1,9 +1,10 @@
 {
   "config": {
     "error": {
-      "invalid_phone_format": "Phone format is invalid",
-      "phone_unknown_server_error": "Unknown server error while registering phone",
-      "invalid_code": "Submitted code is either invalid or expired"
+      "invalid_phone_format": "The phone number format is invalid",
+      "phone_unknown_server_error": "An unknown server error occurred while registering the phone number",
+      "invalid_code": "The submitted code is invalid or has expired",
+      "rate_limited_error": "This Home Assistant instance has exceeded the allowed number of operations. Please try again in 24 hours."
     },
     "step": {
       "user": {

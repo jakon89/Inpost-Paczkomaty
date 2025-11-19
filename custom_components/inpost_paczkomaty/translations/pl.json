@@ -1,9 +1,10 @@
 {
   "config": {
     "error": {
-      "invalid_phone_format": "Format wprowadzonego numer telefonu jest nieprawidłowy.",
-      "phone_unknown_server_error": "Błąd serwera podczas dodawania integracji dla podanego numeru telefonu.",
-      "invalid_code": "Podany kod stracił ważność lub jest nieprawidłowy."
+      "invalid_phone_format": "Nieprawidłowy format numeru telefonu",
+      "phone_unknown_server_error": "Wystąpił nieznany błąd serwera podczas rejestracji numeru telefonu",
+      "invalid_code": "Podany kod jest nieprawidłowy lub wygasł",
+      "rate_limited_error": "Przekroczono limit operacji dla tego urządzenia Home Assistant. Spróbuj ponownie za 24 godziny."
     },
     "step": {
       "user": {

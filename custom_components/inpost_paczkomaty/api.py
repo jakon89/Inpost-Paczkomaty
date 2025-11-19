@@ -9,6 +9,7 @@ from dacite import from_dict
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from aiohttp import ClientResponseError
 
 from custom_components.inpost_paczkomaty.const import (
     HA_ID_ENTRY_CONFIG,
@@ -87,6 +88,13 @@ class CustomInpostApi:
 
                 return response
 
+        except ClientResponseError as e:
+            if e.status == 429:
+                raise RateLimitedError("Too many requests (429)") from e
+            raise ApiClientError(
+                f"Error communicating with API! Status: {e.status}"
+            ) from e
+
         except TimeoutError as e:
             _LOGGER.warning("Request timed out")
             raise ApiClientError("Request timed out") from e
@@ -138,3 +146,9 @@ class InPostApi:
 
 class ApiClientError(Exception):
     """Exception to indicate a general API error."""
+
+
+class RateLimitedError(Exception):
+    """Raised when API returns HTTP 429."""
+
+    pass

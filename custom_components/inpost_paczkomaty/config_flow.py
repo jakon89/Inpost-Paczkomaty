@@ -18,6 +18,7 @@ from homeassistant.helpers.selector import (
 )
 
 from . import CustomInpostApi
+from .api import RateLimitedError
 from .const import DOMAIN, HA_ID_ENTRY_CONFIG, SECRET_ENTRY_CONFIG
 from .utils import haversine
 
@@ -76,6 +77,11 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
 
                     return await self.async_step_code()
+                except RateLimitedError as e:
+                    _LOGGER.error(
+                        "Rate limit kicked in for register_ha_instance: %s", e
+                    )
+                    errors["base"] = "rate_limited_error"
 
                 except Exception as e:
                     _LOGGER.error("Cannot register HA instance: %s", e)
@@ -107,6 +113,10 @@ class InPostAirConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data=self._data,
                     options=user_input,
                 )
+
+            except RateLimitedError as e:
+                _LOGGER.error("Rate limit kicked in for register_ha_instance: %s", e)
+                errors["base"] = "rate_limited_error"
 
             except Exception as e:
                 _LOGGER.error("Cannot confirm HA instance: %s", e)
