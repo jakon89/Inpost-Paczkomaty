@@ -1,28 +1,41 @@
 {
   "config": {
+    "abort": {
+      "token_exchange_failed": "Nie udało się zakończyć uwierzytelniania. Spróbuj ponownie."
+    },
     "error": {
-      "invalid_phone_format": "Nieprawidłowy format numeru telefonu",
-      "phone_unknown_server_error": "Wystąpił nieznany błąd serwera podczas rejestracji numeru telefonu",
-      "invalid_code": "Podany kod jest nieprawidłowy lub wygasł",
-      "rate_limited_error": "Przekroczono limit operacji dla tego urządzenia Home Assistant. Spróbuj ponownie za 24 godziny."
+      "invalid_phone_format": "Nieprawidłowy format numeru telefonu. Podaj dokładnie 9 cyfr.",
+      "phone_unknown_server_error": "Wystąpił nieznany błąd serwera podczas rejestracji numeru telefonu.",
+      "invalid_code": "Podany kod jest nieprawidłowy lub wygasł.",
+      "rate_limited_error": "Zbyt wiele żądań. Spróbuj ponownie później.",
+      "identity_limit_reached": "Osiągnięto maksymalną liczbę zarejestrowanych urządzeń.",
+      "phone_already_registered": "Ten numer telefonu jest już zarejestrowany z innym urządzeniem.",
+      "unexpected_auth_step": "Nieoczekiwany krok uwierzytelniania. Rozpocznij proces od nowa.",
+      "email_not_confirmed": "Email nie został jeszcze potwierdzony. Sprawdź skrzynkę email i kliknij link potwierdzający.",
+      "email_confirmation_error": "Nie udało się wysłać potwierdzenia email. Spróbuj ponownie."
     },
     "step": {
       "user": {
-        "title": "Numer telefonu zarejestrowanego w appce InPost",
-        "description": "Podaj dokładnie 9 cyfr numeru telefonu",
+        "title": "Numer telefonu InPost",
+        "description": "Podaj swój numer telefonu (9 cyfr bez kodu kraju).",
         "data": {
-          "lockers": "Paczkomat",
           "phone_number": "Numer telefonu"
         }
       },
       "code": {
         "title": "Podaj kod SMS",
-        "description": "Podaj kod z SMS który właśnie otrzymałeś",
+        "description": "Podaj 6-cyfrowy kod SMS, który otrzymałeś.",
         "data": {
           "sms_code": "Kod SMS"
         }
       },
+      "email_confirm": {
+        "title": "Wymagane potwierdzenie email",
+        "description": "Na adres `{hashed_email}` został wysłany link potwierdzający. Kliknij link w emailu, a następnie kliknij `Zatwierdź` poniżej."
+      },
       "lockers": {
+        "title": "Wybierz paczkomaty",
+        "description": "Wybierz paczkomaty, które chcesz monitorować.",
         "data": {
           "lockers": "Paczkomaty"
         }

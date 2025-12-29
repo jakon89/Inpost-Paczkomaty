@@ -1,30 +1,43 @@
 {
   "config": {
+    "abort": {
+      "token_exchange_failed": "Failed to complete authentication. Please try again."
+    },
     "error": {
-      "invalid_phone_format": "The phone number format is invalid",
-      "phone_unknown_server_error": "An unknown server error occurred while registering the phone number",
-      "invalid_code": "The submitted code is invalid or has expired",
-      "rate_limited_error": "This Home Assistant instance has exceeded the allowed number of operations. Please try again in 24 hours."
+      "invalid_phone_format": "The phone number format is invalid. Enter exactly 9 digits.",
+      "phone_unknown_server_error": "An unknown server error occurred while registering the phone number.",
+      "invalid_code": "The submitted code is invalid or has expired.",
+      "rate_limited_error": "Too many requests. Please try again later.",
+      "identity_limit_reached": "You have reached the maximum number of device registrations.",
+      "phone_already_registered": "This phone number is already registered with another device.",
+      "unexpected_auth_step": "Unexpected authentication step. Please restart the flow.",
+      "email_not_confirmed": "Email has not been confirmed yet. Please check your email and click the confirmation link.",
+      "email_confirmation_error": "Failed to send email confirmation. Please try again."
     },
     "step": {
       "user": {
-        "title": "InPost phone number",
-        "description": "Enter exactly 9 digits",
+        "title": "InPost Phone Number",
+        "description": "Enter your phone number (9 digits without country code).",
         "data": {
-          "lockers": "Parcel Locker",
-          "phone_number": "Phone number"
+          "phone_number": "Phone Number"
         }
       },
       "code": {
         "title": "Enter SMS Code",
-        "description": "Please enter the SMS code you received.",
+        "description": "Please enter the 6-digit SMS code you received.",
         "data": {
           "sms_code": "SMS Code"
         }
       },
+      "email_confirm": {
+        "title": "Email Confirmation Required",
+        "description": "A confirmation email has been sent to `{hashed_email}`. Please click the link in the email to confirm, then click `Submit` below."
+      },
       "lockers": {
+        "title": "Select Parcel Lockers",
+        "description": "Choose the parcel lockers you want to monitor.",
         "data": {
-          "lockers": "Parcel Locker"
+          "lockers": "Parcel Lockers"
         }
       }
     }

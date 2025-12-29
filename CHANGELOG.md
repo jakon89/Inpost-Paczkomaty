@@ -1,3 +1,21 @@
+# [0.3.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.2.0...v0.3.0) (2025-12-29)
+
+
+### Features
+
+* **auth:** Replace external authentication with direct InPost OAuth2 flow ([#12](https://github.com/jakon89/Inpost-Paczkomaty/issues/12))
+* **auth:** Add PKCE-based OAuth2 authentication with InPost API
+* **auth:** Store access_token and refresh_token for authenticated API calls
+* **auth:** Add email confirmation step for existing InPost accounts
+* **auth:** Support multi-language authentication flow (Polish/English[default])
+
+
+### Breaking Changes
+
+* Authentication now uses InPost's official OAuth2 flow instead of external service
+* Config entry data structure changed - existing integrations will need to be re-configured
+
+
 # [0.2.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.1.0...v0.2.0) (2025-11-19)
 
 
