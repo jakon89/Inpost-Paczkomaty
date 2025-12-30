@@ -9,7 +9,6 @@
       "invalid_code": "The submitted code is invalid or has expired.",
       "rate_limited_error": "Too many requests. Please try again later.",
       "identity_limit_reached": "You have reached the maximum number of device registrations.",
-      "phone_already_registered": "This phone number is already registered with another device.",
       "unexpected_auth_step": "Unexpected authentication step. Please restart the flow.",
       "email_not_confirmed": "Email has not been confirmed yet. Please check your email and click the confirmation link.",
       "email_confirmation_error": "Failed to send email confirmation. Please try again.",

@@ -22,3 +22,4 @@ API_BASE_URL = "https://api-inmobile-pl.easypack24.net"
 # OAuth2 client configuration
 OAUTH_CLIENT_ID = "inpost-mobile"
 OAUTH_REDIRECT_URI = "https://account.inpost-group.com/callback"
+API_USER_AGENT = "InPost-Mobile/4.4.2 (1)-release (iOS 26.2; iPhone15,3; pl)"

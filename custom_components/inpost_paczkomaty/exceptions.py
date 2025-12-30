@@ -168,12 +168,6 @@ class IdentityAdditionLimitReachedError(InPostApiError):
     pass
 
 
-class PhoneNumberAlreadyRegisteredError(InPostApiError):
-    """Raised when the phone number is already registered."""
-
-    pass
-
-
 class InvalidOtpCodeError(InPostApiError):
     """Raised when the OTP code is invalid or expired."""
 
@@ -207,7 +201,6 @@ class RateLimitedError(ApiClientError):
 # Mapping of detail types to specific exception classes
 DETAIL_TYPE_ERROR_MAP: dict[str, type[InPostApiError]] = {
     "IdentityAdditionLimitReached": IdentityAdditionLimitReachedError,
-    "PhoneNumberAlreadyRegistered": PhoneNumberAlreadyRegisteredError,
     "InvalidVerificationCode": InvalidOtpCodeError,
     "VerificationCodeExpired": InvalidOtpCodeError,
     "TooManyRequests": RateLimitError,

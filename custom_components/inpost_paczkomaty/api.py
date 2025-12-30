@@ -12,6 +12,7 @@ from custom_components.inpost_paczkomaty.const import (
     CONF_ACCESS_TOKEN,
     CONF_REFRESH_TOKEN,
     OAUTH_CLIENT_ID,
+    API_USER_AGENT,
 )
 from custom_components.inpost_paczkomaty.exceptions import ApiClientError
 from custom_components.inpost_paczkomaty.http_client import HttpClient
@@ -146,9 +147,7 @@ class InPostApiClient:
             custom_headers={
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
-                "User-Agent": (
-                    "InPost-Mobile/4.4.2 (1)-release (iOS 26.2; iPhone15,3; pl)"
-                ),
+                "User-Agent": API_USER_AGENT,
             },
         )
 
@@ -242,7 +241,7 @@ class InPostApiClient:
             url=f"{API_BASE_URL}{self.PROFILE_ENDPOINT}",
             custom_headers={
                 # without this InPost API returns 500 Internal Server Error
-                "User-Agent": "InPost-Mobile/4.4.2 (1)-release (iOS 26.2; iPhone15,3; pl)",
+                "User-Agent": API_USER_AGENT,
             },
         )
 

@@ -29,7 +29,6 @@ from .exceptions import (
     IdentityAdditionLimitReachedError,
     InPostApiError,
     InvalidOtpCodeError,
-    PhoneNumberAlreadyRegisteredError,
     RateLimitError,
 )
 from .inpost_auth_flow import InpostAuth
@@ -131,11 +130,6 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 except IdentityAdditionLimitReachedError as e:
                     _LOGGER.error("Identity addition limit reached: %s", e)
                     errors["base"] = "identity_limit_reached"
-                    await self._cleanup_auth()
-
-                except PhoneNumberAlreadyRegisteredError as e:
-                    _LOGGER.error("Phone number already registered: %s", e)
-                    errors["base"] = "phone_already_registered"
                     await self._cleanup_auth()
 
                 except InPostApiError as e:

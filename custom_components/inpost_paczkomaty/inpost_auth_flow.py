@@ -182,7 +182,6 @@ class InpostAuth:
 
         Raises:
             IdentityAdditionLimitReachedError: When identity addition limit reached.
-            PhoneNumberAlreadyRegisteredError: When phone is already registered.
             InPostApiError: For other API errors.
         """
         _LOGGER.info("Submitting phone number")

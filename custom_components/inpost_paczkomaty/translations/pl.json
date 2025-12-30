@@ -9,7 +9,6 @@
       "invalid_code": "Podany kod jest nieprawidłowy lub wygasł.",
       "rate_limited_error": "Zbyt wiele żądań. Spróbuj ponownie później.",
       "identity_limit_reached": "Osiągnięto maksymalną liczbę zarejestrowanych urządzeń.",
-      "phone_already_registered": "Ten numer telefonu jest już zarejestrowany z innym urządzeniem.",
       "unexpected_auth_step": "Nieoczekiwany krok uwierzytelniania. Rozpocznij proces od nowa.",
       "email_not_confirmed": "Email nie został jeszcze potwierdzony. Sprawdź skrzynkę email i kliknij link potwierdzający.",
       "email_confirmation_error": "Nie udało się wysłać potwierdzenia email. Spróbuj ponownie.",

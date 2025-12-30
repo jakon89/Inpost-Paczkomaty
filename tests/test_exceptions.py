@@ -12,7 +12,6 @@ from custom_components.inpost_paczkomaty.exceptions import (
     IdentityAdditionLimitReachedError,
     InPostApiError,
     InvalidOtpCodeError,
-    PhoneNumberAlreadyRegisteredError,
     RateLimitedError,
     RateLimitError,
     ServerError,
@@ -210,11 +209,6 @@ class TestSpecificExceptions:
         error = IdentityAdditionLimitReachedError("Limit reached")
         assert isinstance(error, InPostApiError)
 
-    def test_phone_number_already_registered_error(self):
-        """Test PhoneNumberAlreadyRegisteredError."""
-        error = PhoneNumberAlreadyRegisteredError("Already registered")
-        assert isinstance(error, InPostApiError)
-
     def test_invalid_otp_code_error(self):
         """Test InvalidOtpCodeError."""
         error = InvalidOtpCodeError("Invalid code")
@@ -281,19 +275,6 @@ class TestParseApiError:
         result = parse_api_error(response, 422)
 
         assert isinstance(result, IdentityAdditionLimitReachedError)
-
-    def test_maps_phone_number_already_registered(self):
-        """Test mapping PhoneNumberAlreadyRegistered detail type."""
-        nested_detail = json.dumps({"type": "PhoneNumberAlreadyRegistered"})
-        response = {
-            "type": "Error",
-            "status": 422,
-            "detail": nested_detail,
-        }
-
-        result = parse_api_error(response, 422)
-
-        assert isinstance(result, PhoneNumberAlreadyRegisteredError)
 
     def test_maps_invalid_verification_code(self):
         """Test mapping InvalidVerificationCode detail type."""
@@ -403,18 +384,6 @@ class TestParseApiError:
         assert isinstance(result, IdentityAdditionLimitReachedError)
         assert result.error_type == "IdentityAdditionLimitReached"
 
-    def test_maps_error_type_phone_already_registered(self):
-        """Test mapping PhoneNumberAlreadyRegistered error_type."""
-        response = {
-            "type": "PhoneNumberAlreadyRegistered",
-            "status": 422,
-            "title": "Phone Already Registered",
-        }
-
-        result = parse_api_error(response, 422)
-
-        assert isinstance(result, PhoneNumberAlreadyRegisteredError)
-
 
 # =============================================================================
 # Error Mapping Verification Tests
@@ -428,7 +397,6 @@ class TestErrorMappings:
         """Test DETAIL_TYPE_ERROR_MAP has expected entries."""
         expected_mappings = {
             "IdentityAdditionLimitReached": IdentityAdditionLimitReachedError,
-            "PhoneNumberAlreadyRegistered": PhoneNumberAlreadyRegisteredError,
             "InvalidVerificationCode": InvalidOtpCodeError,
             "VerificationCodeExpired": InvalidOtpCodeError,
             "TooManyRequests": RateLimitError,
