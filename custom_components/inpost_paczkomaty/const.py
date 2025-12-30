@@ -3,8 +3,6 @@
 DOMAIN = "inpost_paczkomaty"
 
 # Config entry keys
-HA_ID_ENTRY_CONFIG = "ha_id"
-SECRET_ENTRY_CONFIG = "secret"
 ENTRY_PHONE_NUMBER_CONFIG = "phone_number"
 
 # OAuth2 token storage keys
