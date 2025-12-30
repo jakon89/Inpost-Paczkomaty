@@ -7,6 +7,9 @@ from custom_components.inpost_paczkomaty.models import (
     AuthStep,
     AuthTokens,
     HttpResponse,
+    InPostParcelLocker,
+    InPostParcelLockerPointCoordinates,
+    ParcelLockerListResponse,
     ProfileDelivery,
     ProfileDeliveryPoint,
     ProfileDeliveryPoints,
@@ -342,3 +345,60 @@ class TestUserProfile:
 
         # Should have 2 active lockers, with preferred first
         assert result == ["GDA117M", "GDA145M"]
+
+
+# =============================================================================
+# ParcelLockerListResponse Tests
+# =============================================================================
+
+
+class TestParcelLockerListResponse:
+    """Tests for ParcelLockerListResponse dataclass."""
+
+    def test_init_with_all_fields(self):
+        """Test initialization with all fields."""
+        locker = InPostParcelLocker(
+            n="GDA117M",
+            t=1,
+            d="obiekt mieszkalny",
+            m="Gdańsk",
+            q=0,
+            f="24/7",
+            c="80-180",
+            g="pomorskie",
+            e="PL",
+            r="Wieżycka",
+            o="8",
+            b="",
+            h="",
+            i="",
+            l=InPostParcelLockerPointCoordinates(a=54.3188, o=18.58508),
+            p=1,
+            s=1,
+        )
+
+        response = ParcelLockerListResponse(
+            date="2025-01-01",
+            page=1,
+            total_pages=1,
+            items=[locker],
+        )
+
+        assert response.date == "2025-01-01"
+        assert response.page == 1
+        assert response.total_pages == 1
+        assert len(response.items) == 1
+        assert response.items[0].n == "GDA117M"
+        assert response.items[0].d == "obiekt mieszkalny"
+
+    def test_empty_items(self):
+        """Test response with empty items list."""
+        response = ParcelLockerListResponse(
+            date="2025-01-01",
+            page=1,
+            total_pages=0,
+            items=[],
+        )
+
+        assert response.items == []
+        assert response.total_pages == 0

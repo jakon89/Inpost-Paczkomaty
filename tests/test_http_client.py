@@ -105,7 +105,10 @@ class TestHttpClient:
             )
 
             mock_request.assert_called_once_with(
-                "GET", "https://api.example.com/test", params={"key": "value"}
+                "GET",
+                "https://api.example.com/test",
+                params={"key": "value"},
+                custom_headers=None,
             )
             assert response.status == 200
 
@@ -132,6 +135,7 @@ class TestHttpClient:
                 "https://api.example.com/create",
                 json={"name": "test"},
                 data=None,
+                custom_headers=None,
             )
             assert response.status == 201
 
@@ -155,6 +159,7 @@ class TestHttpClient:
                 "https://api.example.com/form",
                 json=None,
                 data={"field": "value"},
+                custom_headers=None,
             )
 
         await client.close()

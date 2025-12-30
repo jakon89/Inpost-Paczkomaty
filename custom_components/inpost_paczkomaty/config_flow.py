@@ -315,7 +315,7 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_lockers(self, user_input=None):
         """Handle parcel locker selection step."""
-        from .api import InPostApi
+        from .api import InPostApiClient
         from .exceptions import ApiClientError
 
         errors: dict[str, str] = {}
@@ -331,12 +331,12 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Fetch all available parcel lockers
         parcel_lockers: list[SimpleParcelLocker] = []
-        api_client = InPostApi(self.hass)
+        api_client = InPostApiClient(self.hass)
         try:
             parcel_lockers = [
                 SimpleParcelLocker(
                     code=locker.n,
-                    description=locker.d,
+                    description=f"{locker.d} - {locker.c}, {locker.o}, {locker.e} {locker.b}",
                     distance=haversine(
                         self.hass.config.longitude,
                         self.hass.config.latitude,
@@ -407,7 +407,7 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         """Show the list of lockers fetched by coordinator."""
-        from .api import InPostApi
+        from .api import InPostApiClient
         from .exceptions import ApiClientError
 
         errors: dict[str, str] = {}
@@ -420,12 +420,12 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
 
         # Fetch parcel lockers with error handling
         parcel_lockers: list[SimpleParcelLocker] = []
-        api_client = InPostApi(self.hass)
+        api_client = InPostApiClient(self.hass)
         try:
             parcel_lockers = [
                 SimpleParcelLocker(
                     code=locker.n,
-                    description=locker.d,
+                    description=f"{locker.d} - {locker.c}, {locker.o}, {locker.e} {locker.b}",
                     distance=haversine(
                         self.hass.config.longitude,
                         self.hass.config.latitude,

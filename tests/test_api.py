@@ -4,10 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.inpost_paczkomaty.api import (
-    InPostApi,
-    InPostApiClient,
-)
+from custom_components.inpost_paczkomaty.api import InPostApiClient
 from custom_components.inpost_paczkomaty.exceptions import ApiClientError
 from custom_components.inpost_paczkomaty.const import CONF_ACCESS_TOKEN
 from custom_components.inpost_paczkomaty.models import (
@@ -242,11 +239,17 @@ class TestInPostApiClient:
         """Test client close method."""
         client = InPostApiClient(mock_hass, mock_config_entry)
 
-        with patch.object(
-            client._http_client, "close", new_callable=AsyncMock
-        ) as mock_close:
+        with (
+            patch.object(
+                client._http_client, "close", new_callable=AsyncMock
+            ) as mock_close,
+            patch.object(
+                client._public_http_client, "close", new_callable=AsyncMock
+            ) as mock_public_close,
+        ):
             await client.close()
             mock_close.assert_called_once()
+            mock_public_close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_profile_success(
@@ -431,7 +434,7 @@ class TestBuildParcelsSummary:
 
 
 # =============================================================================
-# InPostApi (Parcel Lockers) Tests
+# Parcel Lockers Tests
 # =============================================================================
 
 
@@ -485,15 +488,15 @@ def sample_parcel_lockers_response():
     }
 
 
-class TestInPostApi:
-    """Tests for InPostApi class (parcel lockers)."""
+class TestParcelLockers:
+    """Tests for parcel lockers public endpoint."""
 
     @pytest.mark.asyncio
     async def test_get_parcel_lockers_list_success(
         self, mock_hass, sample_parcel_lockers_response
     ):
         """Test successful parcel lockers list retrieval."""
-        api = InPostApi(mock_hass)
+        client = InPostApiClient(mock_hass)
 
         mock_response = HttpResponse(
             body=sample_parcel_lockers_response,
@@ -501,11 +504,11 @@ class TestInPostApi:
         )
 
         with patch.object(
-            api._http_client, "get", new_callable=AsyncMock
+            client._public_http_client, "get", new_callable=AsyncMock
         ) as mock_get:
             mock_get.return_value = mock_response
 
-            result = await api.get_parcel_lockers_list()
+            result = await client.get_parcel_lockers_list()
 
             assert len(result) == 2
             assert result[0].n == "GDA117M"
@@ -516,7 +519,7 @@ class TestInPostApi:
     @pytest.mark.asyncio
     async def test_get_parcel_lockers_list_api_error(self, mock_hass):
         """Test API error handling for parcel lockers."""
-        api = InPostApi(mock_hass)
+        client = InPostApiClient(mock_hass)
 
         mock_response = HttpResponse(
             body={"error": "Server error"},
@@ -524,40 +527,39 @@ class TestInPostApi:
         )
 
         with patch.object(
-            api._http_client, "get", new_callable=AsyncMock
+            client._public_http_client, "get", new_callable=AsyncMock
         ) as mock_get:
             mock_get.return_value = mock_response
 
             with pytest.raises(ApiClientError) as exc_info:
-                await api.get_parcel_lockers_list()
+                await client.get_parcel_lockers_list()
 
             assert "Status: 500" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_parcel_lockers_list_network_error(self, mock_hass):
         """Test network error handling for parcel lockers."""
-        api = InPostApi(mock_hass)
+        client = InPostApiClient(mock_hass)
 
         with patch.object(
-            api._http_client, "get", new_callable=AsyncMock
+            client._public_http_client, "get", new_callable=AsyncMock
         ) as mock_get:
             mock_get.side_effect = Exception("Network error")
 
             with pytest.raises(ApiClientError) as exc_info:
-                await api.get_parcel_lockers_list()
+                await client.get_parcel_lockers_list()
 
             assert "Error communicating with InPost API!" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_close(self, mock_hass):
-        """Test client close method."""
-        api = InPostApi(mock_hass)
+    async def test_client_without_auth(self, mock_hass):
+        """Test client initialization without authentication."""
+        client = InPostApiClient(mock_hass)
 
-        with patch.object(
-            api._http_client, "close", new_callable=AsyncMock
-        ) as mock_close:
-            await api.close()
-            mock_close.assert_called_once()
+        # Should have public client for unauthenticated requests
+        assert client._public_http_client is not None
+        # Auth header should not be set when no token provided
+        assert "Authorization" not in client._http_client.headers
 
 
 # =============================================================================

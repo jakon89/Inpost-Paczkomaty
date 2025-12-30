@@ -172,7 +172,12 @@ class HttpClient:
             _LOGGER.error("Error making request: %s", e)
             raise e
 
-    async def get(self, url: str, params: Optional[dict] = None, custom_headers: Optional[dict] = None) -> HttpResponse:
+    async def get(
+        self,
+        url: str,
+        params: Optional[dict] = None,
+        custom_headers: Optional[dict] = None,
+    ) -> HttpResponse:
         """
         Execute a GET request.
 
@@ -183,10 +188,16 @@ class HttpClient:
         Returns:
             HttpResponse dataclass with response data.
         """
-        return await self._request("GET", url, params=params, custom_headers=custom_headers)
+        return await self._request(
+            "GET", url, params=params, custom_headers=custom_headers
+        )
 
     async def post(
-        self, url: str, json: Optional[dict] = None, data: Optional[dict] = None, custom_headers: Optional[dict] = None
+        self,
+        url: str,
+        json: Optional[dict] = None,
+        data: Optional[dict] = None,
+        custom_headers: Optional[dict] = None,
     ) -> HttpResponse:
         """
         Execute a POST request.
@@ -199,7 +210,9 @@ class HttpClient:
         Returns:
             HttpResponse dataclass with response data.
         """
-        return await self._request("POST", url, json=json, data=data, custom_headers=custom_headers)
+        return await self._request(
+            "POST", url, json=json, data=data, custom_headers=custom_headers
+        )
 
     async def close(self) -> None:
         """Close the HTTP session."""

@@ -82,6 +82,16 @@ class InPostParcelLocker:
     s: int
 
 
+@dataclass
+class ParcelLockerListResponse:
+    """Response from InPost parcel lockers public endpoint."""
+
+    date: str
+    page: int
+    total_pages: int
+    items: List[InPostParcelLocker]
+
+
 # =============================================================================
 # Official InPost API Response Models
 # =============================================================================
