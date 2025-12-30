@@ -16,7 +16,7 @@ This Home Assistant integration tracks your parcels by fetching data from InPost
    which you also provide.
 2. **Data Flow:** This authentication data is passed to a backend server (hosted by @jakon89), which then uses it to
    query the official InPost servers for your parcel statuses.
-3. **Polling:** Home Assistant polls the integration backend every **30 seconds** to retrieve the latest updates on your
+3. **Polling:** Home Assistant polls the InPost API every **30 seconds** to retrieve the latest updates on your
    parcels.
 
 ---
@@ -33,7 +33,8 @@ This Home Assistant integration tracks your parcels by fetching data from InPost
 6. Go to **Settings** $\rightarrow$ **Devices & Services** $\rightarrow$ **Integrations** $\rightarrow$ **Add
    Integration**, and search for **InPost Paczkomaty**.
 7. Complete the setup flow by providing your phone number and the received SMS code.
-8. Select the specific parcel lockers you wish to monitor.
+8. If prompted, verify your email by clicking the link in the email sent by InPost (this can be done on any device). **Note:** This is a legitimate verification email - it will **not** ask for any credentials. Once verified, click `Submit` to proceed.
+9. Select the specific parcel lockers you wish to monitor.
 
 ### Manual Installation
 
