@@ -44,6 +44,12 @@ class SimpleParcelLocker:
 
     code: str
     description: str
+    city: str
+    street: str
+    building: str
+    zip_code: str
+    latitude: float
+    longitude: float
     distance: float
 
 
@@ -73,6 +79,7 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._data: dict = {}
         self._auth: InpostAuth | None = None
+        self._lockers_map: dict[str, SimpleParcelLocker] = {}
 
     async def _cleanup_auth(self) -> None:
         """Clean up the authentication session."""
@@ -323,20 +330,47 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # User submitted locker selection - create the config entry
             phone_number = self._data.get(ENTRY_PHONE_NUMBER_CONFIG, "")
+            selected_codes = user_input.get("lockers", [])
+            # Build lockers list with full data
+            lockers_data = []
+            for code in selected_codes:
+                locker = self._lockers_map.get(code)
+                if locker:
+                    lockers_data.append(
+                        {
+                            "code": locker.code,
+                            "description": locker.description,
+                            "city": locker.city,
+                            "street": locker.street,
+                            "building": locker.building,
+                            "zip_code": locker.zip_code,
+                            "latitude": locker.latitude,
+                            "longitude": locker.longitude,
+                        }
+                    )
+                else:
+                    lockers_data.append({"code": code})
             return self.async_create_entry(
                 title=f"InPost: +48 {phone_number}",
                 data=self._data,
-                options={"lockers": user_input.get("lockers", [])},
+                options={"lockers": lockers_data},
             )
 
         # Fetch all available parcel lockers
         parcel_lockers: list[SimpleParcelLocker] = []
         api_client = InPostApiClient(self.hass)
         try:
+            raw_lockers = await api_client.get_parcel_lockers_list()
             parcel_lockers = [
                 SimpleParcelLocker(
                     code=locker.n,
-                    description=f"{locker.d} - {locker.c}, {locker.o}, {locker.e} {locker.b}",
+                    description=locker.d,
+                    city=locker.c,
+                    street=locker.e,
+                    building=locker.b,
+                    zip_code=locker.o,
+                    latitude=locker.l.a,
+                    longitude=locker.l.o,
                     distance=haversine(
                         self.hass.config.longitude,
                         self.hass.config.latitude,
@@ -344,8 +378,10 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         locker.l.a,
                     ),
                 )
-                for locker in await api_client.get_parcel_lockers_list()
+                for locker in raw_lockers
             ]
+            # Store lockers for later use when saving
+            self._lockers_map = {locker.code: locker for locker in parcel_lockers}
         except ApiClientError as e:
             _LOGGER.error("Failed to fetch parcel lockers: %s", e)
             errors["base"] = "cannot_fetch_lockers"
@@ -359,7 +395,10 @@ class InPostConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         locker_codes = {locker.code for locker in parcel_lockers}
         options = [
             SelectOptionDict(
-                label=f"{locker.code} [{locker.distance:.2f}km] ({locker.description})",
+                label=(
+                    f"{locker.code} [{locker.distance:.2f}km] "
+                    f"({locker.description} - {locker.city}, {locker.street} {locker.building})"
+                ),
                 value=locker.code,
             )
             for locker in sorted(parcel_lockers, key=lambda locker: locker.distance)
@@ -404,6 +443,7 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry):
         """Initialize options flow."""
         self.entry = entry
+        self._lockers_map: dict[str, SimpleParcelLocker] = {}
 
     async def async_step_init(self, user_input=None):
         """Show the list of lockers fetched by coordinator."""
@@ -413,19 +453,49 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            self.hass.config_entries.async_update_entry(self.entry, options=user_input)
+            selected_codes = user_input.get("lockers", [])
+            # Build lockers list with full data
+            lockers_data = []
+            for code in selected_codes:
+                locker = self._lockers_map.get(code)
+                if locker:
+                    lockers_data.append(
+                        {
+                            "code": locker.code,
+                            "description": locker.description,
+                            "city": locker.city,
+                            "street": locker.street,
+                            "building": locker.building,
+                            "zip_code": locker.zip_code,
+                            "latitude": locker.latitude,
+                            "longitude": locker.longitude,
+                        }
+                    )
+                else:
+                    lockers_data.append({"code": code})
+            options_data = {"lockers": lockers_data}
+            self.hass.config_entries.async_update_entry(
+                self.entry, options=options_data
+            )
             await self.hass.config_entries.async_reload(self.entry.entry_id)
 
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title="", data=options_data)
 
         # Fetch parcel lockers with error handling
         parcel_lockers: list[SimpleParcelLocker] = []
         api_client = InPostApiClient(self.hass)
         try:
+            raw_lockers = await api_client.get_parcel_lockers_list()
             parcel_lockers = [
                 SimpleParcelLocker(
                     code=locker.n,
-                    description=f"{locker.d} - {locker.c}, {locker.o}, {locker.e} {locker.b}",
+                    description=locker.d,
+                    city=locker.c,
+                    street=locker.e,
+                    building=locker.b,
+                    zip_code=locker.o,
+                    latitude=locker.l.a,
+                    longitude=locker.l.o,
                     distance=haversine(
                         self.hass.config.longitude,
                         self.hass.config.latitude,
@@ -433,8 +503,10 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
                         locker.l.a,
                     ),
                 )
-                for locker in await api_client.get_parcel_lockers_list()
+                for locker in raw_lockers
             ]
+            # Store lockers for later use when saving
+            self._lockers_map = {locker.code: locker for locker in parcel_lockers}
         except ApiClientError as e:
             _LOGGER.error("Failed to fetch parcel lockers: %s", e)
             errors["base"] = "cannot_fetch_lockers"
@@ -447,14 +519,23 @@ class InPostOptionsFlow(config_entries.OptionsFlow):
         # Build options for SelectSelector
         options = [
             SelectOptionDict(
-                label=f"{locker.code} [{locker.distance:.2f}km] ({locker.description})",
+                label=(
+                    f"{locker.code} [{locker.distance:.2f}km] "
+                    f"({locker.description} - {locker.city}, {locker.street} {locker.building})"
+                ),
                 value=locker.code,
             )
             for locker in sorted(parcel_lockers, key=lambda locker: locker.distance)
         ]
 
-        # Default selection = previously selected ones
-        current = self.entry.options.get("lockers", [])
+        # Default selection = previously selected ones (handle both old and new format)
+        current_lockers = self.entry.options.get("lockers", [])
+        if current_lockers and isinstance(current_lockers[0], dict):
+            # New format: list of dicts with code and description
+            current = [locker["code"] for locker in current_lockers]
+        else:
+            # Old format: list of codes (for backwards compatibility)
+            current = current_lockers
 
         return self.async_show_form(
             step_id="init",

@@ -21,8 +21,18 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     await coordinator.async_config_entry_first_refresh()
 
+    # Parse lockers - handle both old format (list of codes) and new format (list of dicts)
+    locker_ids = []
+    if tracked_lockers:
+        if isinstance(tracked_lockers[0], dict):
+            # New format: [{"code": "GDA117M", ...}]
+            locker_ids = [locker["code"] for locker in tracked_lockers]
+        else:
+            # Old format: ["GDA117M"] - backwards compatibility
+            locker_ids = tracked_lockers
+
     entities = []
-    for locker_id in tracked_lockers:
+    for locker_id in locker_ids:
         entities.append(
             ParcelLockerBinarySensor(
                 coordinator,

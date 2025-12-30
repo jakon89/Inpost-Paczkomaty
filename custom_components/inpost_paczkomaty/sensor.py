@@ -19,6 +19,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Make sure coordinator has fetched first update
     await coordinator.async_config_entry_first_refresh()
 
+    # Parse lockers - handle both old format (list of codes) and new format (list of dicts)
+    # Build a lookup map: code -> locker data
+    lockers_map: dict[str, dict] = {}
+    if tracked_lockers:
+        if isinstance(tracked_lockers[0], dict):
+            # New format: [{"code": "GDA117M", "description": "...", ...}]
+            lockers_map = {locker["code"]: locker for locker in tracked_lockers}
+        else:
+            # Old format: ["GDA117M"] - backwards compatibility
+            lockers_map = {code: {"code": code} for code in tracked_lockers}
+
     entities = []
 
     # Global sensors
@@ -26,7 +37,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities.append(EnRouteParcelsCount(coordinator, phone_number))
     entities.append(ReadyForPickupParcelsCount(coordinator, phone_number))
 
-    for locker_id in tracked_lockers:
+    for locker_id, locker_data in lockers_map.items():
         # Per locker sensor
         entities.append(
             ParcelLockerNumericSensor(
@@ -63,7 +74,27 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 lambda data, locker_id: locker_id,
             )
         )
-
+        entities.append(
+            ParcelLockerDescriptionSensor(
+                coordinator,
+                phone_number,
+                locker_id,
+                "description",
+                description=locker_data.get("description", ""),
+            )
+        )
+        entities.append(
+            ParcelLockerAddressSensor(
+                coordinator,
+                phone_number,
+                locker_id,
+                "address",
+                city=locker_data.get("city", ""),
+                street=locker_data.get("street", ""),
+                building=locker_data.get("building", ""),
+                zip_code=locker_data.get("zip_code", ""),
+            )
+        )
     async_add_entities(entities)
 
 
@@ -183,3 +214,40 @@ class ParcelLockerIdSensor(ParcelLockerDeviceSensor, SensorEntity):
     @property
     def native_value(self):
         return str(self._locker_id)
+
+
+class ParcelLockerDescriptionSensor(ParcelLockerDeviceSensor, SensorEntity):
+    """Sensor for parcel locker description."""
+
+    def __init__(self, coordinator, phone_number, locker_id, key, description=""):
+        super().__init__(coordinator, phone_number, locker_id, key)
+        self._description = description
+
+    @property
+    def native_value(self):
+        return self._description
+
+
+class ParcelLockerAddressSensor(ParcelLockerDeviceSensor, SensorEntity):
+    """Sensor for parcel locker address."""
+
+    def __init__(
+        self,
+        coordinator,
+        phone_number,
+        locker_id,
+        key,
+        city="",
+        street="",
+        building="",
+        zip_code="",
+    ):
+        super().__init__(coordinator, phone_number, locker_id, key)
+        self._city = city
+        self._street = street
+        self._building = building
+        self._zip_code = zip_code
+
+    @property
+    def native_value(self):
+        return f"{self._city}, {self._zip_code}, {self._street} {self._building}"
