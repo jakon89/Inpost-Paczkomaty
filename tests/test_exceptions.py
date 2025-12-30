@@ -372,6 +372,49 @@ class TestParseApiError:
         # Should be IdentityAdditionLimitReached, not ServerError
         assert isinstance(result, IdentityAdditionLimitReachedError)
 
+    def test_non_dict_response_with_mapped_status_code(self):
+        """Test non-dict response with status code in HTTP_STATUS_ERROR_MAP."""
+        # Test 401 - should return UnauthorizedError
+        result = parse_api_error("Unauthorized access", 401)
+        assert isinstance(result, UnauthorizedError)
+        assert result.status == 401
+
+        # Test 403 - should return ForbiddenError
+        result = parse_api_error("Access denied", 403)
+        assert isinstance(result, ForbiddenError)
+        assert result.status == 403
+
+        # Test 500 - should return ServerError
+        result = parse_api_error("<html>Server Error</html>", 500)
+        assert isinstance(result, ServerError)
+        assert result.status == 500
+
+    def test_maps_error_type_to_specific_error(self):
+        """Test mapping error_type field to specific exception class."""
+        # When error_type matches a key in DETAIL_TYPE_ERROR_MAP
+        response = {
+            "type": "IdentityAdditionLimitReached",
+            "status": 422,
+            "title": "Error",
+        }
+
+        result = parse_api_error(response, 422)
+
+        assert isinstance(result, IdentityAdditionLimitReachedError)
+        assert result.error_type == "IdentityAdditionLimitReached"
+
+    def test_maps_error_type_phone_already_registered(self):
+        """Test mapping PhoneNumberAlreadyRegistered error_type."""
+        response = {
+            "type": "PhoneNumberAlreadyRegistered",
+            "status": 422,
+            "title": "Phone Already Registered",
+        }
+
+        result = parse_api_error(response, 422)
+
+        assert isinstance(result, PhoneNumberAlreadyRegisteredError)
+
 
 # =============================================================================
 # Error Mapping Verification Tests

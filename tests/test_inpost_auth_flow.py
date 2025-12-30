@@ -400,6 +400,44 @@ class TestInpostAuth:
         await auth.close()
 
     @pytest.mark.asyncio
+    async def test_exchange_code_for_tokens_missing_access_token(self):
+        """Test token exchange with missing access_token in response."""
+        auth = InpostAuth()
+
+        with patch.object(
+            auth._http_client, "post", new_callable=AsyncMock
+        ) as mock_post:
+            # Response is successful but doesn't contain access_token
+            mock_post.return_value = HttpResponse(
+                body={"refresh_token": "refresh_456"},
+                status=200,
+            )
+
+            with pytest.raises(ValueError, match="Token exchange failed"):
+                await auth.exchange_code_for_tokens("auth_code")
+
+        await auth.close()
+
+    @pytest.mark.asyncio
+    async def test_exchange_code_for_tokens_non_dict_response(self):
+        """Test token exchange with non-dict response body."""
+        auth = InpostAuth()
+
+        with patch.object(
+            auth._http_client, "post", new_callable=AsyncMock
+        ) as mock_post:
+            # Response is successful but body is not a dict
+            mock_post.return_value = HttpResponse(
+                body="Invalid response",
+                status=200,
+            )
+
+            with pytest.raises(ValueError, match="Token exchange failed"):
+                await auth.exchange_code_for_tokens("auth_code")
+
+        await auth.close()
+
+    @pytest.mark.asyncio
     async def test_close(self):
         """Test closing the auth handler."""
         auth = InpostAuth()

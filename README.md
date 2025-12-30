@@ -64,6 +64,8 @@ For each configured locker (identified by `[LOCKER_ID]`), the following entities
 | Platform        | Entity                                                     | Description                                                                        |
 |:----------------|:-----------------------------------------------------------|:-----------------------------------------------------------------------------------|
 | `sensor`        | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_locker_id`              | The public ID of the specific parcel locker.                                       |
+| `sensor`        | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_description`            | Description of the locker location (e.g., "przy sklepie Biedronka").               |
+| `sensor`        | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_address`                | Full address of the locker (city, zip code, street, building number).              |
 | `binary_sensor` | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_ready_for_pickup`       | $\text{True}$ if **any** parcels are available for pickup in this specific locker. |
 | `sensor`        | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_ready_for_pickup_count` | Number of parcels available for pickup in this specific locker.                    |
 | `binary_sensor` | `inpost_[PHONE_NUMBER]_[LOCKER_ID]_parcels_en_route`       | $\text{True}$ if **any** parcels are en route to this specific locker.             |
@@ -95,5 +97,5 @@ Please create a new GitHub Issue for any feature request you might have.
 
 | Item             | Details                                                                                                        |
 |:-----------------|:---------------------------------------------------------------------------------------------------------------|
-| **Usage Limits** | InPost API may apply HTTP request rate limiting.           |
+| **Usage Limits** | InPost API may apply HTTP request rate limiting.                                                               |
 | **Inspiration**  | Some parts of the codebase were **heavily** inspired by [InPost-Air](https://github.com/CyberDeer/InPost-Air). |

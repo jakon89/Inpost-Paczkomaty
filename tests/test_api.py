@@ -11,7 +11,6 @@ from custom_components.inpost_paczkomaty.models import (
     ApiParcel,
     ApiPickUpPoint,
     HttpResponse,
-    Locker,
     ParcelsSummary,
     UserProfile,
 )

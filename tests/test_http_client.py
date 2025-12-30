@@ -275,3 +275,68 @@ class TestHttpClient:
             custom_headers=None,
         )
         assert "Authorization" not in headers
+
+    @pytest.mark.asyncio
+    async def test_request_returns_text_when_json_fails(self):
+        """Test that _request returns text body when JSON parsing fails."""
+        client = HttpClient()
+
+        # Create a mock response that fails JSON parsing
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.cookies = {}
+        mock_response.headers = {}
+
+        async def raise_json_error():
+            raise ValueError("Invalid JSON")
+
+        async def return_text():
+            return "<html>Not JSON</html>"
+
+        mock_response.json = raise_json_error
+        mock_response.text = return_text
+
+        # Create async context manager
+        mock_context = MagicMock()
+        mock_context.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.request = MagicMock(return_value=mock_context)
+
+        with patch.object(
+            client, "_ensure_session", new_callable=AsyncMock
+        ) as mock_ensure:
+            mock_ensure.return_value = mock_session
+
+            response = await client._request("GET", "https://example.com")
+
+            assert response.body == "<html>Not JSON</html>"
+            assert response.status == 200
+
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_request_raises_generic_exception(self):
+        """Test that _request re-raises generic exceptions."""
+        client = HttpClient()
+
+        # Create a mock context manager that raises during __aenter__
+        mock_context = MagicMock()
+        mock_context.__aenter__ = AsyncMock(
+            side_effect=ConnectionError("Connection refused")
+        )
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.request = MagicMock(return_value=mock_context)
+
+        with patch.object(
+            client, "_ensure_session", new_callable=AsyncMock
+        ) as mock_ensure:
+            mock_ensure.return_value = mock_session
+
+            with pytest.raises(ConnectionError, match="Connection refused"):
+                await client._request("GET", "https://example.com")
+
+        await client.close()
