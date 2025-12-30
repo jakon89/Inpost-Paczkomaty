@@ -1,154 +1,204 @@
 """Functions to connect to InPost APIs."""
 
-import asyncio
 import logging
-from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from aiohttp import ClientResponse
-from dacite import from_dict
+from dacite import Config, from_dict
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from aiohttp import ClientResponseError
 
 from custom_components.inpost_paczkomaty.const import (
-    HA_ID_ENTRY_CONFIG,
-    SECRET_ENTRY_CONFIG,
+    API_BASE_URL,
+    CONF_ACCESS_TOKEN,
 )
+from custom_components.inpost_paczkomaty.exceptions import ApiClientError
+from custom_components.inpost_paczkomaty.http_client import HttpClient
 from custom_components.inpost_paczkomaty.models import (
+    ApiAddressDetails,
+    ApiLocation,
+    ApiParcel,
+    ApiPhoneNumber,
+    ApiPickUpPoint,
+    ApiReceiver,
+    ApiSender,
+    EN_ROUTE_STATUSES,
     InPostParcelLocker,
-    HaInstance,
+    Locker,
     ParcelsSummary,
+    TrackedParcelsResponse,
+)
+from custom_components.inpost_paczkomaty.utils import (
+    convert_keys_to_snake_case,
+    get_language_code,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class ParcelLockerListResponse:
-    date: str
-    page: int
-    total_pages: int
-    items: list[InPostParcelLocker]
+class InPostApiClient:
+    """Client for official InPost API using Bearer token authentication."""
 
+    PARCELS_ENDPOINT = "/v4/parcels/tracked"
 
-class CustomInpostApi:
-    BASE_URL = "https://inpost.mailbay.io"
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        access_token: Optional[str] = None,
+    ) -> None:
+        """Initialize the InPost API client.
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Init class."""
-        self.session = async_create_clientsession(hass)
+        Args:
+            hass: Home Assistant instance.
+            entry: Config entry containing authentication data.
+            access_token: Optional access token override.
+        """
+        self.hass = hass
         data = entry.data if entry and entry.data else {}
-        self._ha_id = data.get(HA_ID_ENTRY_CONFIG)
-        self._secret = data.get(SECRET_ENTRY_CONFIG)
+        token = access_token or data.get(CONF_ACCESS_TOKEN)
+
+        self._http_client = HttpClient(
+            auth_type="Bearer",
+            auth_value=token,
+            custom_headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "Accept-Language": get_language_code(hass.config.language),
+            },
+        )
 
     async def get_parcels(self) -> ParcelsSummary:
-        """Get parcel lockers list."""
-        response = await self._request(
-            method="get",
-            url=f"{self.BASE_URL}/api/ha_instance/{self._ha_id}/parcels?secret={self._secret}",
-        )
-        response_data = from_dict(ParcelsSummary, await response.json())
+        """Get tracked parcels and convert to ParcelsSummary.
 
-        return response_data
+        Returns:
+            ParcelsSummary with parcels grouped by status.
 
-    async def confirm_ha_instance(
-        self, ha_id: str, secret: str, code: str
-    ) -> HaInstance:
-        response = await self._request(
-            method="put",
-            url=f"{self.BASE_URL}/api/ha_instance/{ha_id}?secret={secret}",
-            data={"code": code},
+        Raises:
+            ApiClientError: If API request fails.
+        """
+        response = await self._http_client.get(
+            url=f"{API_BASE_URL}{self.PARCELS_ENDPOINT}"
         )
 
-        return from_dict(HaInstance, await response.json())
-
-    async def register_ha_instance(self, phone: str) -> HaInstance:
-        response = await self._request(
-            method="post",
-            url=f"{self.BASE_URL}/api/ha_instance",
-            data={"phone": phone},
-        )
-
-        return from_dict(HaInstance, await response.json())
-
-    async def _request(
-        self, method: str, url: str, data: dict | None = None
-    ) -> ClientResponse:
-        """Get information from the API."""
-        try:
-            async with asyncio.timeout(60):
-                response = await self.session.request(
-                    method=method,
-                    url=url,
-                    data=data,
-                    headers={"X-HA-Integration": "InPost Paczkomaty"},
-                )
-                response.raise_for_status()
-
-                return response
-
-        except ClientResponseError as e:
-            if e.status == 429:
-                raise RateLimitedError("Too many requests (429)") from e
+        if response.is_error:
+            _LOGGER.error("API request failed with status %d", response.status)
             raise ApiClientError(
-                f"Error communicating with API! Status: {e.status}"
-            ) from e
+                f"Error communicating with InPost API! Status: {response.status}"
+            )
 
-        except TimeoutError as e:
-            _LOGGER.warning("Request timed out")
-            raise ApiClientError("Request timed out") from e
-        except Exception as exception:  # pylint: disable=broad-except
-            _LOGGER.warning("Unknown API error occurred: %s", exception)
+        # Convert camelCase keys to snake_case
+        converted_data = convert_keys_to_snake_case(response.body)
 
-            raise ApiClientError("Error communicating with API!") from exception
+        # Parse response using dacite
+        dacite_config = Config(
+            type_hooks={
+                ApiLocation: lambda d: from_dict(ApiLocation, d, config=Config()),
+                ApiAddressDetails: lambda d: from_dict(
+                    ApiAddressDetails, d, config=Config()
+                ),
+                ApiPickUpPoint: lambda d: from_dict(ApiPickUpPoint, d, config=Config()),
+                ApiPhoneNumber: lambda d: from_dict(ApiPhoneNumber, d, config=Config()),
+                ApiReceiver: lambda d: from_dict(ApiReceiver, d, config=Config()),
+                ApiSender: lambda d: from_dict(ApiSender, d, config=Config()),
+            }
+        )
+        tracked_response = from_dict(
+            TrackedParcelsResponse, converted_data, config=dacite_config
+        )
+
+        return self._build_parcels_summary(tracked_response.parcels)
+
+    def _build_parcels_summary(self, parcels: List[ApiParcel]) -> ParcelsSummary:
+        """Build ParcelsSummary from list of parcels.
+
+        Args:
+            parcels: List of API parcels.
+
+        Returns:
+            ParcelsSummary with parcels grouped by status.
+        """
+        ready_for_pickup: Dict[str, Locker] = {}
+        en_route: Dict[str, Locker] = {}
+
+        ready_count = 0
+        en_route_count = 0
+
+        for parcel in parcels:
+            locker_id = parcel.locker_id or "COURIER"
+
+            if parcel.status == "READY_TO_PICKUP":
+                ready_count += 1
+                if locker_id not in ready_for_pickup:
+                    ready_for_pickup[locker_id] = Locker(
+                        locker_id=locker_id, count=0, parcels=[]
+                    )
+                ready_for_pickup[locker_id].parcels.append(parcel.to_parcel_item())
+                ready_for_pickup[locker_id].count += 1
+
+            elif parcel.status in EN_ROUTE_STATUSES:
+                en_route_count += 1
+                if locker_id not in en_route:
+                    en_route[locker_id] = Locker(
+                        locker_id=locker_id, count=0, parcels=[]
+                    )
+                en_route[locker_id].parcels.append(parcel.to_parcel_item())
+                en_route[locker_id].count += 1
+
+        return ParcelsSummary(
+            all_count=len(parcels),
+            ready_for_pickup_count=ready_count,
+            en_route_count=en_route_count,
+            ready_for_pickup=ready_for_pickup,
+            en_route=en_route,
+        )
+
+    async def close(self) -> None:
+        """Close the HTTP client session."""
+        await self._http_client.close()
+
+
+# Backwards compatibility alias
+CustomInpostApi = InPostApiClient
 
 
 class InPostApi:
+    """Legacy API client for InPost parcel locker locations."""
+
     def __init__(self, hass: HomeAssistant) -> None:
-        """Init class."""
+        """Initialize the legacy API client."""
         self.hass = hass
         self.session = async_create_clientsession(hass)
 
-    async def _request(
-        self,
-        method: str,
-        url: str,
-        headers: dict | None = None,
-    ) -> ClientResponse:
-        """Get information from the API."""
-        try:
-            async with asyncio.timeout(30):
-                response = await self.session.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                )
-                response.raise_for_status()
-
-                return response
-
-        except TimeoutError as e:
-            _LOGGER.warning("Request timed out")
-            raise ApiClientError("Request timed out") from e
-        except Exception as exception:  # pylint: disable=broad-except
-            raise ApiClientError("Error communicating with InPost API!") from exception
-
     async def get_parcel_lockers_list(self) -> list[InPostParcelLocker]:
-        """Get parcel lockers list."""
-        response = await self._request(
-            method="get", url="https://inpost.pl/sites/default/files/points.json"
-        )
-        response_data = from_dict(ParcelLockerListResponse, await response.json())
+        """Get parcel lockers list from public InPost endpoint.
 
-        return response_data.items
+        Returns:
+            List of parcel locker details.
 
+        Raises:
+            ApiClientError: If API request fails.
+        """
+        try:
+            async with self.session.get(
+                "https://inpost.pl/sites/default/files/points.json"
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
 
-class ApiClientError(Exception):
-    """Exception to indicate a general API error."""
+                # Parse response
+                from dataclasses import dataclass
 
+                @dataclass
+                class ParcelLockerListResponse:
+                    date: str
+                    page: int
+                    total_pages: int
+                    items: list[InPostParcelLocker]
 
-class RateLimitedError(Exception):
-    """Raised when API returns HTTP 429."""
+                response_data = from_dict(ParcelLockerListResponse, data)
+                return response_data.items
 
-    pass
+        except Exception as exception:
+            _LOGGER.error("Error fetching parcel lockers: %s", exception)
+            raise ApiClientError("Error communicating with InPost API!") from exception

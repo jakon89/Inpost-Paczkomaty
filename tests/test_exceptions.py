@@ -7,11 +7,13 @@ import pytest
 from custom_components.inpost_paczkomaty.exceptions import (
     DETAIL_TYPE_ERROR_MAP,
     HTTP_STATUS_ERROR_MAP,
+    ApiClientError,
     ForbiddenError,
     IdentityAdditionLimitReachedError,
     InPostApiError,
     InvalidOtpCodeError,
     PhoneNumberAlreadyRegisteredError,
+    RateLimitedError,
     RateLimitError,
     ServerError,
     SessionExpiredError,
@@ -227,6 +229,19 @@ class TestSpecificExceptions:
         """Test ServerError."""
         error = ServerError("Server error")
         assert isinstance(error, InPostApiError)
+
+    def test_api_client_error(self):
+        """Test ApiClientError."""
+        error = ApiClientError("Client error")
+        assert isinstance(error, Exception)
+        assert str(error) == "Client error"
+
+    def test_rate_limited_error(self):
+        """Test RateLimitedError inherits from ApiClientError."""
+        error = RateLimitedError("Rate limited")
+        assert isinstance(error, ApiClientError)
+        assert isinstance(error, Exception)
+        assert str(error) == "Rate limited"
 
 
 # =============================================================================

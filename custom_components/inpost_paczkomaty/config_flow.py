@@ -25,14 +25,14 @@ from .const import (
     CONF_TOKEN_EXPIRES_IN,
     CONF_TOKEN_TYPE,
 )
-from .inpost_auth_flow import (
-    InpostAuth,
-    InPostApiError,
-    RateLimitError,
-    InvalidOtpCodeError,
+from .exceptions import (
     IdentityAdditionLimitReachedError,
+    InPostApiError,
+    InvalidOtpCodeError,
     PhoneNumberAlreadyRegisteredError,
+    RateLimitError,
 )
+from .inpost_auth_flow import InpostAuth
 from .utils import haversine
 
 _LOGGER = logging.getLogger(__name__)

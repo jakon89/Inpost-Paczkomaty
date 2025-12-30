@@ -192,6 +192,18 @@ class ServerError(InPostApiError):
     pass
 
 
+class ApiClientError(Exception):
+    """Exception to indicate a general API client error."""
+
+    pass
+
+
+class RateLimitedError(ApiClientError):
+    """Raised when API returns HTTP 429 (rate limited)."""
+
+    pass
+
+
 # Mapping of detail types to specific exception classes
 DETAIL_TYPE_ERROR_MAP: dict[str, type[InPostApiError]] = {
     "IdentityAdditionLimitReached": IdentityAdditionLimitReachedError,

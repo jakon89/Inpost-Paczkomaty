@@ -1,3 +1,5 @@
+"""InPost Paczkomaty integration for Home Assistant."""
+
 from __future__ import annotations
 
 import logging
@@ -7,8 +9,8 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from custom_components.inpost_paczkomaty.coordinator import InpostDataCoordinator
-from .api import CustomInpostApi
-from .const import HA_ID_ENTRY_CONFIG
+from .api import InPostApiClient
+from .const import ENTRY_PHONE_NUMBER_CONFIG
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,11 +18,13 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up InPost Paczkomaty from a config entry."""
     _LOGGER.info(
-        "Starting Inpost Paczkomaty with ha_id: %s", entry.data.get(HA_ID_ENTRY_CONFIG)
+        "Starting InPost Paczkomaty for phone: %s",
+        entry.data.get(ENTRY_PHONE_NUMBER_CONFIG, "unknown"),
     )
 
-    api_client = CustomInpostApi(hass, entry)
+    api_client = InPostApiClient(hass, entry)
     coordinator = InpostDataCoordinator(hass, api_client)
 
     await coordinator.async_config_entry_first_refresh()

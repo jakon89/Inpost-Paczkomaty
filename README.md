@@ -86,7 +86,6 @@ For each configured locker (identified by `[LOCKER_ID]`), the following entities
 * Add a `inpost_[PHONE_NUMBER]_[LOCKER_ID]_deadline` entity to monitor pickup deadlines for each ready-for-pickup parcel in a locker.
 * Add branding images to https://github.com/home-assistant/brands
 * Add this repository to HACS
-* Remove relay backend server and call InPost API directly from the integration.
 
 Please create a new GitHub Issue for any feature request you might have.
 
@@ -96,6 +95,5 @@ Please create a new GitHub Issue for any feature request you might have.
 
 | Item             | Details                                                                                                        |
 |:-----------------|:---------------------------------------------------------------------------------------------------------------|
-| **Backend Host** | Hosted by [jakon89](https://github.com/jakon89).                                                               |
-| **Usage Limits** | The developer reserves the right to apply usage limits if suspicious or excessive usage is detected.           |
+| **Usage Limits** | InPost API may apply HTTP request rate limiting.           |
 | **Inspiration**  | Some parts of the codebase were **heavily** inspired by [InPost-Air](https://github.com/CyberDeer/InPost-Air). |
