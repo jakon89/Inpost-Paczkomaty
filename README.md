@@ -43,7 +43,56 @@ This Home Assistant integration tracks your parcels by fetching data from InPost
 3. **Restart Home Assistant**.
 4. Execute steps **6, 7, and 8** from the HACS installation method above.
 
----
+## Usage
+
+### Dashboard panel
+
+Display parcel counts directly on your Home Assistant dashboard to see at a glance how many packages are waiting for pickup. This is especially handy if you have a dashboard near your door—check whether a trip to the Paczkomat® is needed before heading out.
+
+**Markdown panel example:**
+
+![Markdown panel example](docs/img/markdown-panel-example.png)
+
+```text
+# 📦 Parcels waiting: {{ (states('sensor.inpost_123456789_ready_for_pickup_parcels_count') | int) + (states('sensor.inpost_987654321_ready_for_pickup_parcels_count') | int) }}
+## 🙋‍♀️ Wife: {{ states('sensor.inpost_987654321_ready_for_pickup_parcels_count') }}
+## 🙋‍♂️ Husband: {{ states('sensor.inpost_123456789_ready_for_pickup_parcels_count') }}
+```
+
+#### Parcels ready for pick up notification
+
+Get a notification on your phone when you're approaching home and parcels are waiting at the Paczkomat®. This way, you can stop by the locker on your way in - no need to get home first, only to remember that you or someone else in your household has a package to collect.
+
+```yaml
+alias: Parcel pickup reminder
+description: ""
+triggers:
+  - trigger: zone
+    entity_id: person.husband
+    zone: zone.home
+    event: enter
+conditions:
+  - condition: or
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.inpost_123456789_ready_for_pickup_parcels_count
+        above: 0
+      - condition: numeric_state
+        entity_id: sensor.inpost_987654321_ready_for_pickup_parcels_count
+        above: 0
+actions:
+  - action: notify.mobile_app_iphone_husband
+    metadata: {}
+    data:
+      title: 📦 Parcels waiting
+      message: >-
+        🙋‍♀️ Wife: {{
+        states('sensor.inpost_987654321_ready_for_pickup_parcels_count') }}.
+
+        🙋‍♂️ Husband: {{
+        states('sensor.inpost_123456789_ready_for_pickup_parcels_count') }}.
+mode: single
+```
 
 ## Entities
 
@@ -95,7 +144,8 @@ Please create a new GitHub Issue for any feature request you might have.
 
 ## Disclaimers
 
-| Item             | Details                                                                                                        |
-|:-----------------|:---------------------------------------------------------------------------------------------------------------|
-| **Usage Limits** | InPost API may apply HTTP request rate limiting.                                                               |
-| **Inspiration**  | Some parts of the codebase were **heavily** inspired by [InPost-Air](https://github.com/CyberDeer/InPost-Air). |
+| Item             | Details                                                                                                                                   |
+|:-----------------|:------------------------------------------------------------------------------------------------------------------------------------------|
+| **Usage Limits** | InPost API may apply HTTP request rate limiting.                                                                                          |
+|   **API AUTH**   | InPost API may require additional authentication in future. Currently this integration use refresh token to keep access token up to date. |
+| **Inspiration**  | Some parts of the codebase were **heavily** inspired by [InPost-Air](https://github.com/CyberDeer/InPost-Air).                            |
