@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.2.0...v0.3.0) (2026-01-04)
+
+
+### Features
+
+* Direct InPost OAuth2 Authentication without backend server ([#18](https://github.com/jakon89/Inpost-Paczkomaty/issues/18)) ([132c81f](https://github.com/jakon89/Inpost-Paczkomaty/commit/132c81f95a7927f3a97d84814bc9731b163c8ee9))
+
 # [0.2.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.1.0...v0.2.0) (2025-11-19)
 
 
