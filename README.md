@@ -28,11 +28,9 @@ Note: Simply re-adding the integration should work for most users. Full removal 
 
 ## How It Works
 
-This Home Assistant integration tracks your parcels by fetching data from InPost servers via a **relay backend server**.
-
 1. **Authentication:** You provide your **phone number** to the integration setup. You then receive an **SMS code**
    which you also provide. If prompted, verify your email by clicking the link in the email sent to you by InPost (this can be done on any device).
-2. **Data Flow:** This authentication data is stored loccaly and send only to official InPost servers for authentication purposes. After succesfull authentication only API tokens are stored on you HA instance (refresh token, access token, etc).
+2. **Data Flow:** Authentication data is stored locally and send only to official InPost servers for authentication purposes. After successful authentication API tokens are stored on you HA instance (refresh token, access token, etc).
 3. **Polling:** Home Assistant polls the InPost API every **30 seconds** to retrieve the latest updates on your
    parcels.
 
@@ -165,5 +163,5 @@ Please create a new GitHub Issue for any feature request you might have.
 | Item             | Details                                                                                                                                   |
 |:-----------------|:------------------------------------------------------------------------------------------------------------------------------------------|
 | **Usage Limits** | InPost API may apply HTTP request rate limiting.                                                                                          |
-|   **API AUTH**   | InPost API may require additional authentication in future. Currently this integration use refresh token to keep access token up to date. |
+| **API AUTH**     | InPost API may require additional authentication in future. Currently this integration use refresh token to keep access token up to date. |
 | **Inspiration**  | Some parts of the codebase were **heavily** inspired by [InPost-Air](https://github.com/CyberDeer/InPost-Air).                            |
