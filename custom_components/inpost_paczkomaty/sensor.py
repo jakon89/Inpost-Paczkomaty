@@ -44,6 +44,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities.append(EnRouteParcelsCount(coordinator, phone_number))
     entities.append(ReadyForPickupParcelsCount(coordinator, phone_number))
 
+    # Parcels list sensors for dashboard markdown card
+    entities.append(ParcelsListSensor(coordinator, phone_number))
+
     # Carbon footprint sensors
     entities.append(TotalCarbonFootprintSensor(coordinator, phone_number))
     entities.append(TodayCarbonFootprintSensor(coordinator, phone_number))
@@ -172,6 +175,62 @@ class ReadyForPickupParcelsCount(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.data.ready_for_pickup_count
+
+
+class ParcelsListSensor(CoordinatorEntity, SensorEntity):
+    """Sensor with parcels list for dashboard markdown card display.
+
+    This sensor provides lists of en_route and ready_for_pickup parcels
+    as attributes that can be used with markdown cards with QR code
+    generation via JavaScript.
+    """
+
+    _attr_icon = "mdi:package-variant"
+
+    def __init__(self, coordinator, phone_number):
+        """Initialize the parcels list sensor."""
+        super().__init__(coordinator)
+        self._phone_number = phone_number
+        self._attr_name = f"InPost {self._phone_number} parcels list"
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this sensor."""
+        return f"{DOMAIN}_{self._phone_number}_parcels_list"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return None
+
+    @property
+    def native_value(self) -> int:
+        """Return total active parcels count as state value."""
+        data = self.coordinator.data
+        return data.ready_for_pickup_count + data.en_route_count
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return parcels lists for dashboard display.
+
+        Attributes include:
+        - ready_for_pickup: List of parcels ready for pickup with QR codes
+        - en_route: List of parcels in transit
+        - ready_for_pickup_count: Count of parcels ready for pickup
+        - en_route_count: Count of parcels en route
+        """
+        data = self.coordinator.data
+
+        # Convert ParcelListItem objects to dicts
+        ready_for_pickup = [parcel.to_dict() for parcel in data.ready_for_pickup_list]
+        en_route = [parcel.to_dict() for parcel in data.en_route_list]
+
+        return {
+            "ready_for_pickup": ready_for_pickup,
+            "en_route": en_route,
+            "ready_for_pickup_count": data.ready_for_pickup_count,
+            "en_route_count": data.en_route_count,
+        }
 
 
 class ParcelLockerDeviceSensor(CoordinatorEntity):

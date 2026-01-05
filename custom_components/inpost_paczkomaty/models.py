@@ -36,6 +36,61 @@ class Locker:
 
 
 @dataclass
+class ParcelListItem:
+    """Parcel item for list display in dashboard markdown card."""
+
+    shipment_number: str
+    sender_name: Optional[str]
+    status: str
+    status_description: str
+    shipment_type: str  # "parcel" or "courier"
+    parcel_size: Optional[str]
+    ownership_status: Optional[str]
+
+    # Receiver info
+    phone_number: Optional[str]  # Receiver phone number (e.g., "+48987654321")
+
+    # Pickup point info
+    pickup_point_name: Optional[str]  # Locker name (e.g., "GDA117M") or None
+    pickup_point_address: Optional[str]  # Formatted address
+    pickup_point_description: Optional[str]  # Location description
+    pickup_point_city: Optional[str]
+    pickup_point_street: Optional[str]
+    pickup_point_building: Optional[str]
+    pickup_point_post_code: Optional[str]
+
+    # Codes for pickup (only for READY_TO_PICKUP)
+    open_code: Optional[str]
+    qr_code: Optional[str]
+
+    # Dates
+    stored_date: Optional[str]  # ISO date string
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for sensor attributes."""
+        return {
+            "shipment_number": self.shipment_number,
+            "sender_name": self.sender_name,
+            "status": self.status,
+            "status_description": self.status_description,
+            "shipment_type": self.shipment_type,
+            "parcel_size": self.parcel_size,
+            "ownership_status": self.ownership_status,
+            "phone_number": self.phone_number,
+            "pickup_point_name": self.pickup_point_name,
+            "pickup_point_address": self.pickup_point_address,
+            "pickup_point_description": self.pickup_point_description,
+            "pickup_point_city": self.pickup_point_city,
+            "pickup_point_street": self.pickup_point_street,
+            "pickup_point_building": self.pickup_point_building,
+            "pickup_point_post_code": self.pickup_point_post_code,
+            "open_code": self.open_code,
+            "qr_code": self.qr_code,
+            "stored_date": self.stored_date,
+        }
+
+
+@dataclass
 class ParcelsSummary:
     """Summary of all parcels by status."""
 
@@ -45,6 +100,9 @@ class ParcelsSummary:
     ready_for_pickup: Dict[str, Locker]
     en_route: Dict[str, Locker]
     carbon_footprint_stats: Optional["CarbonFootprintStats"] = None
+    # Lists for dashboard display
+    ready_for_pickup_list: List["ParcelListItem"] = field(default_factory=list)
+    en_route_list: List["ParcelListItem"] = field(default_factory=list)
 
 
 @dataclass
@@ -235,6 +293,63 @@ class ApiParcel:
             code=self.open_code,
             status=self.status,
             status_desc=self.status_description,
+        )
+
+    def to_parcel_list_item(self) -> "ParcelListItem":
+        """Convert to ParcelListItem for dashboard display."""
+        # Build pickup point info
+        pickup_name = None
+        pickup_address = None
+        pickup_description = None
+        pickup_city = None
+        pickup_street = None
+        pickup_building = None
+        pickup_post_code = None
+
+        if self.pick_up_point:
+            pickup_name = self.pick_up_point.name
+            pickup_description = self.pick_up_point.location_description
+
+            if self.pick_up_point.address_details:
+                addr = self.pick_up_point.address_details
+                pickup_city = addr.city
+                pickup_street = addr.street
+                pickup_building = addr.building_number
+                pickup_post_code = addr.post_code
+
+                # Build formatted address
+                parts = []
+                if addr.street:
+                    street_part = addr.street
+                    if addr.building_number:
+                        street_part += f" {addr.building_number}"
+                    parts.append(street_part)
+                if addr.city:
+                    city_part = addr.city
+                    if addr.post_code:
+                        city_part = f"{addr.post_code} {city_part}"
+                    parts.append(city_part)
+                pickup_address = ", ".join(parts)
+
+        return ParcelListItem(
+            shipment_number=self.shipment_number,
+            sender_name=self.sender.name if self.sender else None,
+            status=self.status,
+            status_description=self.status_description,
+            shipment_type=self.shipment_type,
+            parcel_size=self.parcel_size,
+            ownership_status=self.ownership_status,
+            phone_number=self.phone,
+            pickup_point_name=pickup_name,
+            pickup_point_address=pickup_address,
+            pickup_point_description=pickup_description,
+            pickup_point_city=pickup_city,
+            pickup_point_street=pickup_street,
+            pickup_point_building=pickup_building,
+            pickup_point_post_code=pickup_post_code,
+            open_code=self.open_code,
+            qr_code=self.qr_code,
+            stored_date=self.stored_date,
         )
 
     @property

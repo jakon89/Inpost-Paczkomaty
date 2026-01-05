@@ -35,6 +35,7 @@ from custom_components.inpost_paczkomaty.models import (
     EN_ROUTE_STATUSES,
     InPostParcelLocker,
     Locker,
+    ParcelListItem,
     ParcelLockerListResponse,
     ParcelsSummary,
     ProfileDelivery,
@@ -361,6 +362,10 @@ class InPostApiClient:
         ready_count = 0
         en_route_count = 0
 
+        # Lists for dashboard display
+        ready_for_pickup_list: List[ParcelListItem] = []
+        en_route_list: List[ParcelListItem] = []
+
         # Carbon footprint tracking
         daily_co2: Dict[str, Dict[str, float]] = {}  # {date: {co2, count}}
         total_co2 = 0.0
@@ -381,6 +386,8 @@ class InPostApiClient:
                     )
                 ready_for_pickup[locker_id].parcels.append(parcel.to_parcel_item())
                 ready_for_pickup[locker_id].count += 1
+                # Add to list for dashboard
+                ready_for_pickup_list.append(parcel.to_parcel_list_item())
 
             elif (
                 parcel.status in EN_ROUTE_STATUSES
@@ -393,6 +400,8 @@ class InPostApiClient:
                     )
                 en_route[locker_id].parcels.append(parcel.to_parcel_item())
                 en_route[locker_id].count += 1
+                # Add to list for dashboard
+                en_route_list.append(parcel.to_parcel_list_item())
 
             # Calculate carbon footprint for DELIVERED parcels
             if parcel.status == "DELIVERED":
@@ -431,6 +440,8 @@ class InPostApiClient:
             ready_for_pickup=ready_for_pickup,
             en_route=en_route,
             carbon_footprint_stats=carbon_stats,
+            ready_for_pickup_list=ready_for_pickup_list,
+            en_route_list=en_route_list,
         )
 
     async def close(self) -> None:

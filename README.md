@@ -143,6 +143,80 @@ Display parcel counts directly on your Home Assistant dashboard to see at a glan
 ## 🙋‍♂️ Husband: {{ states('sensor.inpost_123456789_ready_for_pickup_parcels_count') }}
 ```
 
+#### Advanced Parcels Dashboard with QR Codes
+
+Display detailed parcels information with QR codes for easy pickup using Home Assistant's built-in `<ha-qr-code>` component.
+
+**Markdown card configuration:**
+
+```yaml
+type: markdown
+content: |
+  {% set parcels_sensor = 'sensor.inpost_123456789_parcels_list' %}
+  {% set ready = state_attr(parcels_sensor, 'ready_for_pickup') or [] %}
+  {% set en_route = state_attr(parcels_sensor, 'en_route') or [] %}
+
+  # 📦 Parcels Dashboard
+
+  ## 🟢 Ready for Pickup ({{ ready | length }})
+
+  {% for p in ready %}
+  ---
+  **{{ p.sender_name or 'Unknown sender' }}** {% if p.parcel_size %}({{ p.parcel_size }}){% endif %}
+
+  📍 **{{ p.pickup_point_name or 'Courier' }}** {% if p.pickup_point_description %}- {{ p.pickup_point_description }}{% endif %}
+
+  {% if p.pickup_point_address %}{{ p.pickup_point_address }}{% endif %}
+
+  {% if p.phone_number %}📱 Phone: **{{ p.phone_number }}**{% endif %}
+
+  {% if p.open_code %}🔑 Code: **{{ p.open_code }}**{% endif %}
+
+  {% if p.qr_code %}<ha-qr-code data="{{ p.qr_code }}" width="150"></ha-qr-code>{% endif %}
+
+  {% endfor %}
+
+  {% if en_route | length > 0 %}
+  ## 🚚 En Route ({{ en_route | length }})
+
+  {% for p in en_route %}
+  ---
+  **{{ p.sender_name or 'Unknown sender' }}** {% if p.parcel_size %}({{ p.parcel_size }}){% endif %}
+
+  📍 {{ p.pickup_point_name or 'Courier delivery' }} {% if p.pickup_point_description %}- {{ p.pickup_point_description }}{% endif %}
+
+  {% if p.phone_number %}📱 Phone: **{{ p.phone_number }}**{% endif %}
+
+  Status: {{ p.status_description }}
+
+  {% endfor %}
+  {% endif %}
+```
+
+**Simpler version without QR codes:**
+
+```yaml
+type: markdown
+content: |
+  {% set parcels_sensor = 'sensor.inpost_123456789_parcels_list' %}
+  {% set ready = state_attr(parcels_sensor, 'ready_for_pickup') or [] %}
+  {% set en_route = state_attr(parcels_sensor, 'en_route') or [] %}
+
+  # 📦 Parcels: {{ ready | length }} ready, {{ en_route | length }} en route
+
+  {% for p in ready %}
+  ---
+  ## 🟢 {{ p.sender_name or 'Unknown' }}
+  📍 {{ p.pickup_point_name }} | 🔑 **{{ p.open_code }}**
+  {% endfor %}
+
+  {% for p in en_route %}
+  ---
+  ## 🚚 {{ p.sender_name or 'Unknown' }}
+  📍 {{ p.pickup_point_name or 'Courier' }} | {{ p.status_description }}
+  {% endfor %}
+```
+
 #### Parcels ready for pick up notification
 
 Get a notification on your phone when you're approaching home and parcels are waiting at the Paczkomat®. This way, you can stop by the locker on your way in - no need to get home first, only to remember that you or someone else in your household has a package to collect.
@@ -189,6 +263,36 @@ The integration creates entities for the overall account (phone number registere
 | `sensor` | `inpost_[PHONE_NUMBER]_all_parcels_count`              | Total number of all tracked parcels bound to your phone number(Delivered + En Route + Ready for Pickup). |
 | `sensor` | `inpost_[PHONE_NUMBER]_en_route_parcels_count`         | Number of parcels currently en route to any locker.                                                      |
 | `sensor` | `inpost_[PHONE_NUMBER]_ready_for_pickup_parcels_count` | Number of parcels ready for pickup across all configured lockers.                                        |
+| `sensor` | `inpost_[PHONE_NUMBER]_parcels_list`                   | Parcels list sensor with detailed parcel data for dashboard display (see attributes below).              |
+
+#### Parcels List Sensor Attributes
+
+The `parcels_list` sensor provides detailed parcel information for advanced dashboard cards:
+
+| Attribute                | Type  | Description                                                              |
+|:-------------------------|:------|:-------------------------------------------------------------------------|
+| `ready_for_pickup`       | list  | List of parcels ready for pickup with open codes and QR codes.           |
+| `en_route`               | list  | List of parcels in transit.                                              |
+| `ready_for_pickup_count` | int   | Number of parcels ready for pickup.                                      |
+| `en_route_count`         | int   | Number of parcels en route.                                              |
+
+Each parcel in the list contains:
+
+| Field                      | Description                                                |
+|:---------------------------|:-----------------------------------------------------------|
+| `shipment_number`          | Parcel tracking number.                                    |
+| `sender_name`              | Name of the sender.                                        |
+| `status`                   | Current parcel status.                                     |
+| `status_description`       | Human-readable status description.                         |
+| `shipment_type`            | Type: "parcel" (locker) or "courier".                      |
+| `parcel_size`              | Size: A, B, C, or OTHER.                                   |
+| `phone_number`             | Receiver phone number (e.g., "+48987654321").              |
+| `pickup_point_name`        | Locker code (e.g., "GDA117M") or null for courier.         |
+| `pickup_point_address`     | Formatted address of pickup point.                         |
+| `pickup_point_description` | Location description (e.g., "obiekt mieszkalny").          |
+| `open_code`                | Code to open the locker (only for ready_to_pickup).        |
+| `qr_code`                  | QR code data string (only for ready_to_pickup).            |
+| `stored_date`              | When parcel was stored in locker (ISO format).             |
 
 ### Carbon Footprint Entities
 

@@ -181,11 +181,11 @@ def sample_profile_response():
     """Sample InPost profile API response data."""
     return {
         "personal": {
-            "firstName": "Mykola",
-            "lastName": "Mykhalov",
+            "firstName": "Jan",
+            "lastName": "Kowalski",
             "email": "test@example.com",
             "emailVerified": True,
-            "phoneNumber": "575875127",
+            "phoneNumber": "123456789",
             "phoneNumberPrefix": "+48",
         },
         "delivery": {
@@ -426,7 +426,7 @@ class TestInPostApiClient:
             assert isinstance(result, UserProfile)
             assert result.shopping_active is True
             assert result.personal is not None
-            assert result.personal.first_name == "Mykola"
+            assert result.personal.first_name == "Jan"
             assert result.delivery is not None
             assert result.delivery.points is not None
             assert len(result.delivery.points.items) == 3
@@ -1003,6 +1003,171 @@ class TestBuildParcelsSummary:
         # Both OWN and FRIEND parcels should be counted
         assert result.ready_for_pickup_count == 2
         assert result.ready_for_pickup["GDA117M"].count == 2
+
+    def test_ready_for_pickup_list_populated(self, mock_hass, mock_config_entry):
+        """Test that ready_for_pickup_list is populated with ParcelListItem objects."""
+        from custom_components.inpost_paczkomaty.models import (
+            ApiAddressDetails,
+            ApiSender,
+        )
+
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="620070566580180012876790",
+                status="READY_TO_PICKUP",
+                shipment_type="parcel",
+                open_code="615144",
+                qr_code="P|+48987654321|615144",
+                stored_date="2025-12-02T06:43:05.000Z",
+                parcel_size="A",
+                ownership_status="OWN",
+                sender=ApiSender(name="COFFEE&SONS"),
+                pick_up_point=ApiPickUpPoint(
+                    name="GDA117M",
+                    location_description="obiekt mieszkalny",
+                    address_details=ApiAddressDetails(
+                        post_code="80-180",
+                        city="Gdańsk",
+                        street="Wieżycka",
+                        building_number="8",
+                    ),
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert len(result.ready_for_pickup_list) == 1
+        item = result.ready_for_pickup_list[0]
+        assert item.shipment_number == "620070566580180012876790"
+        assert item.sender_name == "COFFEE&SONS"
+        assert item.status == "READY_TO_PICKUP"
+        assert item.open_code == "615144"
+        assert item.qr_code == "P|+48987654321|615144"
+        assert item.pickup_point_name == "GDA117M"
+        assert item.pickup_point_description == "obiekt mieszkalny"
+
+    def test_en_route_list_populated(self, mock_hass, mock_config_entry):
+        """Test that en_route_list is populated with ParcelListItem objects."""
+        from custom_components.inpost_paczkomaty.models import ApiSender
+
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="520113012280180076018438",
+                status="OUT_FOR_DELIVERY",
+                shipment_type="courier",
+                parcel_size="OTHER",
+                ownership_status="OWN",
+                sender=ApiSender(name="Amazon Polska"),
+                pick_up_point=None,
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert len(result.en_route_list) == 1
+        item = result.en_route_list[0]
+        assert item.shipment_number == "520113012280180076018438"
+        assert item.sender_name == "Amazon Polska"
+        assert item.status == "OUT_FOR_DELIVERY"
+        assert item.shipment_type == "courier"
+        assert item.pickup_point_name is None
+
+    def test_parcel_lists_empty_for_delivered(self, mock_hass, mock_config_entry):
+        """Test that delivered parcels don't appear in lists."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert len(result.ready_for_pickup_list) == 0
+        assert len(result.en_route_list) == 0
+
+    def test_parcel_lists_respect_show_only_own_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test that parcel lists respect show_only_own_parcels setting."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=True
+        )
+
+        parcels = [
+            ApiParcel(
+                shipment_number="1",
+                status="READY_TO_PICKUP",
+                ownership_status="OWN",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+            ApiParcel(
+                shipment_number="2",
+                status="READY_TO_PICKUP",
+                ownership_status="FRIEND",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+            ApiParcel(
+                shipment_number="3",
+                status="OUT_FOR_DELIVERY",
+                ownership_status="OWN",
+                pick_up_point=ApiPickUpPoint(name="GDA08M"),
+            ),
+            ApiParcel(
+                shipment_number="4",
+                status="OUT_FOR_DELIVERY",
+                ownership_status="FRIEND",
+                pick_up_point=ApiPickUpPoint(name="GDA08M"),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Only OWN parcels should be in lists
+        assert len(result.ready_for_pickup_list) == 1
+        assert result.ready_for_pickup_list[0].shipment_number == "1"
+        assert len(result.en_route_list) == 1
+        assert result.en_route_list[0].shipment_number == "3"
+
+    def test_parcel_lists_to_dict_for_sensor_attributes(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test that parcel lists can be converted to dicts for sensor attributes."""
+        from custom_components.inpost_paczkomaty.models import ApiSender
+
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="READY_TO_PICKUP",
+                open_code="615144",
+                qr_code="P|+48987654321|615144",
+                sender=ApiSender(name="TestSender"),
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Convert to dicts like the sensor would
+        ready_for_pickup_dicts = [
+            parcel.to_dict() for parcel in result.ready_for_pickup_list
+        ]
+
+        assert len(ready_for_pickup_dicts) == 1
+        assert isinstance(ready_for_pickup_dicts[0], dict)
+        assert ready_for_pickup_dicts[0]["shipment_number"] == "123"
+        assert ready_for_pickup_dicts[0]["open_code"] == "615144"
+        assert ready_for_pickup_dicts[0]["qr_code"] == "P|+48987654321|615144"
 
 
 # =============================================================================

@@ -4,9 +4,11 @@ import pytest
 
 from custom_components.inpost_paczkomaty.exceptions import InPostApiError
 from custom_components.inpost_paczkomaty.models import (
+    ApiAddressDetails,
     ApiCarbonFootprint,
     ApiParcel,
     ApiPickUpPoint,
+    ApiSender,
     AuthStep,
     AuthTokens,
     CarbonFootprintStats,
@@ -14,6 +16,7 @@ from custom_components.inpost_paczkomaty.models import (
     HttpResponse,
     InPostParcelLocker,
     InPostParcelLockerPointCoordinates,
+    ParcelListItem,
     ParcelLockerListResponse,
     ProfileDelivery,
     ProfileDeliveryPoint,
@@ -682,3 +685,326 @@ class TestCarbonFootprintStats:
         assert len(stats.daily_data) == 2
         assert stats.daily_data[0].date == "2025-12-01"
         assert stats.daily_data[1].value == 0.024
+
+
+# =============================================================================
+# ParcelListItem Tests
+# =============================================================================
+
+
+class TestParcelListItem:
+    """Tests for ParcelListItem dataclass."""
+
+    def test_init_with_all_fields(self):
+        """Test initialization with all fields."""
+        item = ParcelListItem(
+            shipment_number="620070566580180012876790",
+            sender_name="COFFEE&SONS",
+            status="READY_TO_PICKUP",
+            status_description="Gotowa do odbioru",
+            shipment_type="parcel",
+            parcel_size="A",
+            ownership_status="OWN",
+            phone_number="+48987654321",
+            pickup_point_name="GDA117M",
+            pickup_point_address="Wieżycka 8, 80-180 Gdańsk",
+            pickup_point_description="obiekt mieszkalny",
+            pickup_point_city="Gdańsk",
+            pickup_point_street="Wieżycka",
+            pickup_point_building="8",
+            pickup_point_post_code="80-180",
+            open_code="615144",
+            qr_code="P|+48987654321|615144",
+            stored_date="2025-12-02T06:43:05.000Z",
+        )
+
+        assert item.shipment_number == "620070566580180012876790"
+        assert item.sender_name == "COFFEE&SONS"
+        assert item.status == "READY_TO_PICKUP"
+        assert item.open_code == "615144"
+        assert item.qr_code == "P|+48987654321|615144"
+        assert item.pickup_point_name == "GDA117M"
+        assert item.phone_number == "+48987654321"
+
+    def test_init_with_minimal_fields(self):
+        """Test initialization with minimal fields for courier delivery."""
+        item = ParcelListItem(
+            shipment_number="520113012280180076018438",
+            sender_name="Amazon Polska",
+            status="OUT_FOR_DELIVERY",
+            status_description="Wydana do doręczenia",
+            shipment_type="courier",
+            parcel_size="OTHER",
+            ownership_status="OWN",
+            phone_number="+48123456789",
+            pickup_point_name=None,
+            pickup_point_address=None,
+            pickup_point_description=None,
+            pickup_point_city=None,
+            pickup_point_street=None,
+            pickup_point_building=None,
+            pickup_point_post_code=None,
+            open_code=None,
+            qr_code=None,
+            stored_date=None,
+        )
+
+        assert item.shipment_number == "520113012280180076018438"
+        assert item.pickup_point_name is None
+        assert item.open_code is None
+        assert item.phone_number == "+48123456789"
+
+    def test_to_dict(self):
+        """Test to_dict method returns correct dictionary."""
+        item = ParcelListItem(
+            shipment_number="620070566580180012876790",
+            sender_name="COFFEE&SONS",
+            status="READY_TO_PICKUP",
+            status_description="Gotowa do odbioru",
+            shipment_type="parcel",
+            parcel_size="A",
+            ownership_status="OWN",
+            phone_number="+48987654321",
+            pickup_point_name="GDA117M",
+            pickup_point_address="Wieżycka 8, 80-180 Gdańsk",
+            pickup_point_description="obiekt mieszkalny",
+            pickup_point_city="Gdańsk",
+            pickup_point_street="Wieżycka",
+            pickup_point_building="8",
+            pickup_point_post_code="80-180",
+            open_code="615144",
+            qr_code="P|+48987654321|615144",
+            stored_date="2025-12-02T06:43:05.000Z",
+        )
+
+        result = item.to_dict()
+
+        assert isinstance(result, dict)
+        assert result["shipment_number"] == "620070566580180012876790"
+        assert result["sender_name"] == "COFFEE&SONS"
+        assert result["status"] == "READY_TO_PICKUP"
+        assert result["open_code"] == "615144"
+        assert result["qr_code"] == "P|+48987654321|615144"
+        assert result["pickup_point_name"] == "GDA117M"
+        assert result["pickup_point_address"] == "Wieżycka 8, 80-180 Gdańsk"
+        assert result["phone_number"] == "+48987654321"
+
+    def test_to_dict_with_none_values(self):
+        """Test to_dict includes None values."""
+        item = ParcelListItem(
+            shipment_number="123",
+            sender_name=None,
+            status="OUT_FOR_DELIVERY",
+            status_description="Wydana do doręczenia",
+            shipment_type="courier",
+            parcel_size=None,
+            ownership_status="OWN",
+            phone_number=None,
+            pickup_point_name=None,
+            pickup_point_address=None,
+            pickup_point_description=None,
+            pickup_point_city=None,
+            pickup_point_street=None,
+            pickup_point_building=None,
+            pickup_point_post_code=None,
+            open_code=None,
+            qr_code=None,
+            stored_date=None,
+        )
+
+        result = item.to_dict()
+
+        assert result["sender_name"] is None
+        assert result["open_code"] is None
+        assert result["pickup_point_name"] is None
+        assert result["phone_number"] is None
+
+
+# =============================================================================
+# ApiParcel to_parcel_list_item Tests
+# =============================================================================
+
+
+class TestApiParcelToParcelListItem:
+    """Tests for ApiParcel.to_parcel_list_item method."""
+
+    def test_to_parcel_list_item_with_parcel_locker(self):
+        """Test conversion with full parcel locker data."""
+        from custom_components.inpost_paczkomaty.models import (
+            ApiPhoneNumber,
+            ApiReceiver,
+        )
+
+        parcel = ApiParcel(
+            shipment_number="620070566580180012876790",
+            status="READY_TO_PICKUP",
+            shipment_type="parcel",
+            open_code="615144",
+            qr_code="P|+48987654321|615144",
+            stored_date="2025-12-02T06:43:05.000Z",
+            parcel_size="A",
+            ownership_status="OWN",
+            sender=ApiSender(name="COFFEE&SONS"),
+            receiver=ApiReceiver(
+                phone_number=ApiPhoneNumber(prefix="+48", value="987654321"),
+            ),
+            pick_up_point=ApiPickUpPoint(
+                name="GDA117M",
+                location_description="obiekt mieszkalny",
+                address_details=ApiAddressDetails(
+                    post_code="80-180",
+                    city="Gdańsk",
+                    province="pomorskie",
+                    street="Wieżycka",
+                    building_number="8",
+                    country="PL",
+                ),
+                type=["parcel_locker"],
+            ),
+        )
+
+        item = parcel.to_parcel_list_item()
+
+        assert item.shipment_number == "620070566580180012876790"
+        assert item.sender_name == "COFFEE&SONS"
+        assert item.status == "READY_TO_PICKUP"
+        assert item.status_description == "Gotowa do odbioru"
+        assert item.shipment_type == "parcel"
+        assert item.parcel_size == "A"
+        assert item.ownership_status == "OWN"
+        assert item.phone_number == "+48987654321"
+        assert item.pickup_point_name == "GDA117M"
+        assert item.pickup_point_description == "obiekt mieszkalny"
+        assert item.pickup_point_city == "Gdańsk"
+        assert item.pickup_point_street == "Wieżycka"
+        assert item.pickup_point_building == "8"
+        assert item.pickup_point_post_code == "80-180"
+        assert item.pickup_point_address == "Wieżycka 8, 80-180 Gdańsk"
+        assert item.open_code == "615144"
+        assert item.qr_code == "P|+48987654321|615144"
+        assert item.stored_date == "2025-12-02T06:43:05.000Z"
+
+    def test_to_parcel_list_item_courier_no_pickup_point(self):
+        """Test conversion for courier delivery without pickup point."""
+        parcel = ApiParcel(
+            shipment_number="520113012280180076018438",
+            status="OUT_FOR_DELIVERY",
+            shipment_type="courier",
+            parcel_size="OTHER",
+            ownership_status="OWN",
+            sender=ApiSender(name="Amazon Polska"),
+            pick_up_point=None,
+            receiver=None,
+        )
+
+        item = parcel.to_parcel_list_item()
+
+        assert item.shipment_number == "520113012280180076018438"
+        assert item.sender_name == "Amazon Polska"
+        assert item.status == "OUT_FOR_DELIVERY"
+        assert item.shipment_type == "courier"
+        assert item.phone_number is None
+        assert item.pickup_point_name is None
+        assert item.pickup_point_address is None
+        assert item.pickup_point_description is None
+        assert item.open_code is None
+        assert item.qr_code is None
+
+    def test_to_parcel_list_item_no_sender(self):
+        """Test conversion when sender is None."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="CONFIRMED",
+            sender=None,
+        )
+
+        item = parcel.to_parcel_list_item()
+
+        assert item.sender_name is None
+
+    def test_to_parcel_list_item_pickup_point_no_address_details(self):
+        """Test conversion when pickup point has no address details."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="READY_TO_PICKUP",
+            pick_up_point=ApiPickUpPoint(
+                name="GDA117M",
+                location_description="obiekt mieszkalny",
+                address_details=None,
+            ),
+        )
+
+        item = parcel.to_parcel_list_item()
+
+        assert item.pickup_point_name == "GDA117M"
+        assert item.pickup_point_description == "obiekt mieszkalny"
+        assert item.pickup_point_city is None
+        assert item.pickup_point_address is None
+
+    def test_to_parcel_list_item_partial_address(self):
+        """Test conversion with partial address data."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="READY_TO_PICKUP",
+            pick_up_point=ApiPickUpPoint(
+                name="GDA117M",
+                address_details=ApiAddressDetails(
+                    city="Gdańsk",
+                    post_code="80-180",
+                    street=None,
+                    building_number=None,
+                ),
+            ),
+        )
+
+        item = parcel.to_parcel_list_item()
+
+        assert item.pickup_point_city == "Gdańsk"
+        assert item.pickup_point_post_code == "80-180"
+        assert item.pickup_point_street is None
+        assert item.pickup_point_address == "80-180 Gdańsk"
+
+    def test_to_parcel_list_item_address_formatting(self):
+        """Test address formatting with various combinations."""
+        # Street only
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="READY_TO_PICKUP",
+            pick_up_point=ApiPickUpPoint(
+                name="GDA117M",
+                address_details=ApiAddressDetails(
+                    street="Wieżycka",
+                    building_number="8",
+                ),
+            ),
+        )
+
+        item = parcel.to_parcel_list_item()
+        assert item.pickup_point_address == "Wieżycka 8"
+
+    def test_to_parcel_list_item_to_dict_integration(self):
+        """Test full pipeline from ApiParcel to dict."""
+        parcel = ApiParcel(
+            shipment_number="620070566580180012876790",
+            status="READY_TO_PICKUP",
+            shipment_type="parcel",
+            open_code="615144",
+            qr_code="P|+48987654321|615144",
+            sender=ApiSender(name="COFFEE&SONS"),
+            pick_up_point=ApiPickUpPoint(
+                name="GDA117M",
+                address_details=ApiAddressDetails(
+                    city="Gdańsk",
+                    post_code="80-180",
+                    street="Wieżycka",
+                    building_number="8",
+                ),
+            ),
+        )
+
+        result = parcel.to_parcel_list_item().to_dict()
+
+        assert isinstance(result, dict)
+        assert result["shipment_number"] == "620070566580180012876790"
+        assert result["open_code"] == "615144"
+        assert result["qr_code"] == "P|+48987654321|615144"
