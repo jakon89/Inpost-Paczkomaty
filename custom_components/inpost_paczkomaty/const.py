@@ -2,6 +2,10 @@
 
 DOMAIN = "inpost_paczkomaty"
 
+# Configuration keys for configuration.yaml
+CONF_UPDATE_INTERVAL = "update_interval_seconds"
+DEFAULT_UPDATE_INTERVAL = 30  # seconds
+
 # Config entry keys
 ENTRY_PHONE_NUMBER_CONFIG = "phone_number"
 
