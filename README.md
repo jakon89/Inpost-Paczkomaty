@@ -292,6 +292,10 @@ Each parcel in the list contains:
 | `pickup_point_name`        | Locker code (e.g., "GDA117M") or null for courier.         |
 | `pickup_point_address`     | Formatted address of pickup point.                         |
 | `pickup_point_description` | Location description (e.g., "obiekt mieszkalny").          |
+| `pickup_point_city`        | City of pickup point (e.g., "Gdańsk").                     |
+| `pickup_point_street`      | Street name of pickup point (e.g., "Wieżycka").            |
+| `pickup_point_building`    | Building number of pickup point (e.g., "8").               |
+| `pickup_point_post_code`   | Postal code of pickup point (e.g., "80-180").              |
 | `open_code`                | Code to open the locker (only for ready_to_pickup).        |
 | `qr_code`                  | QR code data string (only for ready_to_pickup).            |
 | `stored_date`              | When parcel was stored in locker (ISO format).             |
