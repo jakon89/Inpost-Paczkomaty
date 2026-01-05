@@ -11,6 +11,7 @@ from custom_components.inpost_paczkomaty.const import (
     API_BASE_URL,
     CONF_ACCESS_TOKEN,
     CONF_REFRESH_TOKEN,
+    DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
     OAUTH_CLIENT_ID,
     API_USER_AGENT,
@@ -71,6 +72,7 @@ class InPostApiClient:
         refresh_token: Optional[str] = None,
         on_token_refresh: Optional[Callable[[AuthTokens], None]] = None,
         ignored_en_route_statuses: Optional[List[str]] = None,
+        http_timeout: int = DEFAULT_HTTP_TIMEOUT,
     ) -> None:
         """Initialize the InPost API client.
 
@@ -81,6 +83,7 @@ class InPostApiClient:
             refresh_token: Optional refresh token override.
             on_token_refresh: Optional callback when token is refreshed.
             ignored_en_route_statuses: List of en_route statuses to ignore.
+            http_timeout: HTTP request timeout in seconds.
         """
         self.hass = hass
         data = entry.data if entry and entry.data else {}
@@ -102,13 +105,15 @@ class InPostApiClient:
                 "Content-Type": "application/json",
                 "Accept-Language": get_language_code(hass.config.language),
             },
+            default_timeout=http_timeout,
         )
 
         # Unauthenticated client for public endpoints
         self._public_http_client = HttpClient(
             custom_headers={
                 "Accept": "application/json",
-            }
+            },
+            default_timeout=http_timeout,
         )
 
     async def _ensure_valid_token(self) -> None:

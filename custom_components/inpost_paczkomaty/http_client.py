@@ -37,6 +37,7 @@ class HttpClient:
         auth_type: Optional[str] = None,
         auth_value: Optional[str] = None,
         custom_headers: Optional[dict] = None,
+        default_timeout: int = 30,
     ) -> None:
         """
         Initialize the HTTP client with optional authentication.
@@ -45,9 +46,11 @@ class HttpClient:
             auth_type: Type of authentication (e.g., "Bearer").
             auth_value: Authentication token value.
             custom_headers: Additional headers to include in requests.
+            default_timeout: Default request timeout in seconds.
         """
         self.headers = self._build_headers(auth_type, auth_value, custom_headers)
         self.session: Optional[aiohttp.ClientSession] = None
+        self.default_timeout = default_timeout
 
     def _build_headers(
         self,
@@ -118,7 +121,7 @@ class HttpClient:
         params: Optional[dict] = None,
         json: Optional[dict] = None,
         data: Optional[dict] = None,
-        timeout: Optional[int] = 30,
+        timeout: Optional[int] = None,
         custom_headers: Optional[dict] = None,
     ) -> HttpResponse:
         """
@@ -130,7 +133,7 @@ class HttpClient:
             params: Query parameters.
             json: JSON body data.
             data: Form data.
-            timeout: Request timeout in seconds.
+            timeout: Request timeout in seconds. Uses default_timeout if not specified.
 
         Returns:
             HttpResponse dataclass with response data.
@@ -142,8 +145,9 @@ class HttpClient:
         _LOGGER.debug("Making %s request to %s", method, url)
         headers = {**self.headers, **(custom_headers or {})}
         _LOGGER.debug("Headers: %s", headers)
+        request_timeout = timeout if timeout is not None else self.default_timeout
         try:
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(request_timeout):
                 async with session.request(
                     method=method,
                     url=url,

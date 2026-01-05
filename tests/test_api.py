@@ -12,6 +12,7 @@ from custom_components.inpost_paczkomaty.exceptions import ApiClientError
 from custom_components.inpost_paczkomaty.const import (
     CONF_ACCESS_TOKEN,
     CONF_REFRESH_TOKEN,
+    DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
 )
 from custom_components.inpost_paczkomaty.models import (
@@ -283,6 +284,23 @@ class TestInPostApiClient:
         )
 
         assert client._ignored_en_route_statuses == frozenset()
+
+    def test_init_with_default_http_timeout(self, mock_hass, mock_config_entry):
+        """Test client initialization uses default HTTP timeout."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        assert client._http_client.default_timeout == DEFAULT_HTTP_TIMEOUT
+        assert client._public_http_client.default_timeout == DEFAULT_HTTP_TIMEOUT
+
+    def test_init_with_custom_http_timeout(self, mock_hass, mock_config_entry):
+        """Test client initialization with custom HTTP timeout."""
+        custom_timeout = 60
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, http_timeout=custom_timeout
+        )
+
+        assert client._http_client.default_timeout == custom_timeout
+        assert client._public_http_client.default_timeout == custom_timeout
 
     @pytest.mark.asyncio
     async def test_get_parcels_success(

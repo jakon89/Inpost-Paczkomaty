@@ -48,9 +48,7 @@ class InpostDataCoordinator(DataUpdateCoordinator[ParcelsSummary]):
             UpdateFailed: If API request fails.
         """
         try:
-            async with asyncio.timeout(30):
-                return await self.api_client.get_parcels()
-
+            return await self.api_client.get_parcels()
         except Exception as err:
             _LOGGER.error("Cannot read parcels from InPost API: %s", err)
             raise UpdateFailed("Error fetching InPost parcels update") from err

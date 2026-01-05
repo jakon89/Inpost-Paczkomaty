@@ -14,8 +14,10 @@ import homeassistant.helpers.config_validation as cv
 from custom_components.inpost_paczkomaty.coordinator import InpostDataCoordinator
 from .api import InPostApiClient
 from .const import (
+    CONF_HTTP_TIMEOUT,
     CONF_IGNORED_EN_ROUTE_STATUSES,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -38,6 +40,9 @@ CONFIG_SCHEMA = vol.Schema(
                     CONF_IGNORED_EN_ROUTE_STATUSES,
                     default=DEFAULT_IGNORED_EN_ROUTE_STATUSES,
                 ): vol.All(cv.ensure_list, [cv.string]),
+                vol.Optional(
+                    CONF_HTTP_TIMEOUT, default=DEFAULT_HTTP_TIMEOUT
+                ): cv.positive_int,
             }
         )
     },
@@ -67,9 +72,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ignored_en_route_statuses = domain_config.get(
         CONF_IGNORED_EN_ROUTE_STATUSES, DEFAULT_IGNORED_EN_ROUTE_STATUSES
     )
+    http_timeout = domain_config.get(CONF_HTTP_TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 
     api_client = InPostApiClient(
-        hass, entry, ignored_en_route_statuses=ignored_en_route_statuses
+        hass,
+        entry,
+        ignored_en_route_statuses=ignored_en_route_statuses,
+        http_timeout=http_timeout,
     )
     coordinator = InpostDataCoordinator(hass, api_client, update_interval)
 
