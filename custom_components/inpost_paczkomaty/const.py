@@ -12,6 +12,9 @@ DEFAULT_IGNORED_EN_ROUTE_STATUSES = ["CONFIRMED"]
 CONF_HTTP_TIMEOUT = "http_timeout_seconds"
 DEFAULT_HTTP_TIMEOUT = 30  # seconds
 
+CONF_PARCEL_LOCKERS_URL = "parcel_lockers_url"
+DEFAULT_PARCEL_LOCKERS_URL = "https://inpost.pl/sites/default/files/points.json"
+
 # Config entry keys
 ENTRY_PHONE_NUMBER_CONFIG = "phone_number"
 

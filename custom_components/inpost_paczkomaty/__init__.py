@@ -16,9 +16,11 @@ from .api import InPostApiClient
 from .const import (
     CONF_HTTP_TIMEOUT,
     CONF_IGNORED_EN_ROUTE_STATUSES,
+    CONF_PARCEL_LOCKERS_URL,
     CONF_UPDATE_INTERVAL,
     DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
+    DEFAULT_PARCEL_LOCKERS_URL,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     ENTRY_PHONE_NUMBER_CONFIG,
@@ -43,6 +45,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(
                     CONF_HTTP_TIMEOUT, default=DEFAULT_HTTP_TIMEOUT
                 ): cv.positive_int,
+                vol.Optional(
+                    CONF_PARCEL_LOCKERS_URL, default=DEFAULT_PARCEL_LOCKERS_URL
+                ): cv.url,
             }
         )
     },
@@ -73,12 +78,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         CONF_IGNORED_EN_ROUTE_STATUSES, DEFAULT_IGNORED_EN_ROUTE_STATUSES
     )
     http_timeout = domain_config.get(CONF_HTTP_TIMEOUT, DEFAULT_HTTP_TIMEOUT)
+    parcel_lockers_url = domain_config.get(
+        CONF_PARCEL_LOCKERS_URL, DEFAULT_PARCEL_LOCKERS_URL
+    )
 
     api_client = InPostApiClient(
         hass,
         entry,
         ignored_en_route_statuses=ignored_en_route_statuses,
         http_timeout=http_timeout,
+        parcel_lockers_url=parcel_lockers_url,
     )
     coordinator = InpostDataCoordinator(hass, api_client, update_interval)
 

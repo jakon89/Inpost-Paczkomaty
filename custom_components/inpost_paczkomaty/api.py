@@ -13,6 +13,7 @@ from custom_components.inpost_paczkomaty.const import (
     CONF_REFRESH_TOKEN,
     DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
+    DEFAULT_PARCEL_LOCKERS_URL,
     OAUTH_CLIENT_ID,
     API_USER_AGENT,
 )
@@ -62,7 +63,6 @@ class InPostApiClient:
     PARCELS_ENDPOINT = "/v4/parcels/tracked"
     PROFILE_ENDPOINT = "/izi/app/shopping/v2/profile"
     TOKEN_ENDPOINT = "/global/oauth2/token"
-    PARCEL_LOCKERS_URL = "https://inpost.pl/sites/default/files/points.json"
 
     def __init__(
         self,
@@ -73,6 +73,7 @@ class InPostApiClient:
         on_token_refresh: Optional[Callable[[AuthTokens], None]] = None,
         ignored_en_route_statuses: Optional[List[str]] = None,
         http_timeout: int = DEFAULT_HTTP_TIMEOUT,
+        parcel_lockers_url: str = DEFAULT_PARCEL_LOCKERS_URL,
     ) -> None:
         """Initialize the InPost API client.
 
@@ -84,7 +85,9 @@ class InPostApiClient:
             on_token_refresh: Optional callback when token is refreshed.
             ignored_en_route_statuses: List of en_route statuses to ignore.
             http_timeout: HTTP request timeout in seconds.
+            parcel_lockers_url: URL for fetching parcel lockers list.
         """
+        self._parcel_lockers_url = parcel_lockers_url
         self.hass = hass
         data = entry.data if entry and entry.data else {}
         self._access_token = access_token or data.get(CONF_ACCESS_TOKEN)
@@ -313,7 +316,7 @@ class InPostApiClient:
             ApiClientError: If API request fails.
         """
         try:
-            response = await self._public_http_client.get(url=self.PARCEL_LOCKERS_URL)
+            response = await self._public_http_client.get(url=self._parcel_lockers_url)
 
             if response.is_error:
                 _LOGGER.error(

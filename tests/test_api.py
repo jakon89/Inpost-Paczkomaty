@@ -14,6 +14,7 @@ from custom_components.inpost_paczkomaty.const import (
     CONF_REFRESH_TOKEN,
     DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
+    DEFAULT_PARCEL_LOCKERS_URL,
 )
 from custom_components.inpost_paczkomaty.models import (
     ApiParcel,
@@ -301,6 +302,21 @@ class TestInPostApiClient:
 
         assert client._http_client.default_timeout == custom_timeout
         assert client._public_http_client.default_timeout == custom_timeout
+
+    def test_init_with_default_parcel_lockers_url(self, mock_hass, mock_config_entry):
+        """Test client initialization uses default parcel lockers URL."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        assert client._parcel_lockers_url == DEFAULT_PARCEL_LOCKERS_URL
+
+    def test_init_with_custom_parcel_lockers_url(self, mock_hass, mock_config_entry):
+        """Test client initialization with custom parcel lockers URL."""
+        custom_url = "https://custom.example.com/lockers.json"
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, parcel_lockers_url=custom_url
+        )
+
+        assert client._parcel_lockers_url == custom_url
 
     @pytest.mark.asyncio
     async def test_get_parcels_success(
