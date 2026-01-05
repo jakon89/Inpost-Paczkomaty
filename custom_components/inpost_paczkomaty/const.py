@@ -15,6 +15,9 @@ DEFAULT_HTTP_TIMEOUT = 30  # seconds
 CONF_PARCEL_LOCKERS_URL = "parcel_lockers_url"
 DEFAULT_PARCEL_LOCKERS_URL = "https://inpost.pl/sites/default/files/points.json"
 
+CONF_SHOW_ONLY_OWN_PARCELS = "show_only_own_parcels"
+DEFAULT_SHOW_ONLY_OWN_PARCELS = False
+
 # Config entry keys
 ENTRY_PHONE_NUMBER_CONFIG = "phone_number"
 

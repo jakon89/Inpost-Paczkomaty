@@ -15,6 +15,7 @@ from custom_components.inpost_paczkomaty.const import (
     DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
     DEFAULT_PARCEL_LOCKERS_URL,
+    DEFAULT_SHOW_ONLY_OWN_PARCELS,
 )
 from custom_components.inpost_paczkomaty.models import (
     ApiParcel,
@@ -317,6 +318,25 @@ class TestInPostApiClient:
         )
 
         assert client._parcel_lockers_url == custom_url
+
+    def test_init_with_default_show_only_own_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test client initialization uses default show_only_own_parcels."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        assert client._show_only_own_parcels == DEFAULT_SHOW_ONLY_OWN_PARCELS
+        assert client._show_only_own_parcels is False
+
+    def test_init_with_show_only_own_parcels_enabled(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test client initialization with show_only_own_parcels enabled."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=True
+        )
+
+        assert client._show_only_own_parcels is True
 
     @pytest.mark.asyncio
     async def test_get_parcels_success(
@@ -910,6 +930,78 @@ class TestBuildParcelsSummary:
         assert result.en_route_count == 0
         assert result.ready_for_pickup == {}
         assert result.en_route == {}
+
+    def test_show_only_own_parcels_filters_friend_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test that show_only_own_parcels filters out FRIEND parcels."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=True
+        )
+
+        parcels = [
+            ApiParcel(
+                shipment_number="1",
+                status="READY_TO_PICKUP",
+                ownership_status="OWN",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+            ApiParcel(
+                shipment_number="2",
+                status="READY_TO_PICKUP",
+                ownership_status="FRIEND",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+            ApiParcel(
+                shipment_number="3",
+                status="OUT_FOR_DELIVERY",
+                ownership_status="OWN",
+                pick_up_point=ApiPickUpPoint(name="GDA08M"),
+            ),
+            ApiParcel(
+                shipment_number="4",
+                status="OUT_FOR_DELIVERY",
+                ownership_status="FRIEND",
+                pick_up_point=ApiPickUpPoint(name="GDA08M"),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Only OWN parcels should be counted
+        assert result.ready_for_pickup_count == 1
+        assert result.en_route_count == 1
+        assert result.ready_for_pickup["GDA117M"].count == 1
+        assert result.en_route["GDA08M"].count == 1
+
+    def test_show_all_parcels_includes_friend_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test that default setting includes both OWN and FRIEND parcels."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=False
+        )
+
+        parcels = [
+            ApiParcel(
+                shipment_number="1",
+                status="READY_TO_PICKUP",
+                ownership_status="OWN",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+            ApiParcel(
+                shipment_number="2",
+                status="READY_TO_PICKUP",
+                ownership_status="FRIEND",
+                pick_up_point=ApiPickUpPoint(name="GDA117M"),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Both OWN and FRIEND parcels should be counted
+        assert result.ready_for_pickup_count == 2
+        assert result.ready_for_pickup["GDA117M"].count == 2
 
 
 # =============================================================================

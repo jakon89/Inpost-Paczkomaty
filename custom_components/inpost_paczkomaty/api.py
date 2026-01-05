@@ -14,6 +14,7 @@ from custom_components.inpost_paczkomaty.const import (
     DEFAULT_HTTP_TIMEOUT,
     DEFAULT_IGNORED_EN_ROUTE_STATUSES,
     DEFAULT_PARCEL_LOCKERS_URL,
+    DEFAULT_SHOW_ONLY_OWN_PARCELS,
     OAUTH_CLIENT_ID,
     API_USER_AGENT,
 )
@@ -74,6 +75,7 @@ class InPostApiClient:
         ignored_en_route_statuses: Optional[List[str]] = None,
         http_timeout: int = DEFAULT_HTTP_TIMEOUT,
         parcel_lockers_url: str = DEFAULT_PARCEL_LOCKERS_URL,
+        show_only_own_parcels: bool = DEFAULT_SHOW_ONLY_OWN_PARCELS,
     ) -> None:
         """Initialize the InPost API client.
 
@@ -86,8 +88,10 @@ class InPostApiClient:
             ignored_en_route_statuses: List of en_route statuses to ignore.
             http_timeout: HTTP request timeout in seconds.
             parcel_lockers_url: URL for fetching parcel lockers list.
+            show_only_own_parcels: If True, only show parcels with OWN ownership.
         """
         self._parcel_lockers_url = parcel_lockers_url
+        self._show_only_own_parcels = show_only_own_parcels
         self.hass = hass
         data = entry.data if entry and entry.data else {}
         self._access_token = access_token or data.get(CONF_ACCESS_TOKEN)
@@ -352,6 +356,10 @@ class InPostApiClient:
         en_route_count = 0
 
         for parcel in parcels:
+            # Skip shared parcels if show_only_own_parcels is enabled
+            if self._show_only_own_parcels and parcel.ownership_status != "OWN":
+                continue
+
             locker_id = parcel.locker_id or "COURIER"
 
             if parcel.status == "READY_TO_PICKUP":
