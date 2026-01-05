@@ -190,6 +190,32 @@ The integration creates entities for the overall account (phone number registere
 | `sensor` | `inpost_[PHONE_NUMBER]_en_route_parcels_count`         | Number of parcels currently en route to any locker.                                                      |
 | `sensor` | `inpost_[PHONE_NUMBER]_ready_for_pickup_parcels_count` | Number of parcels ready for pickup across all configured lockers.                                        |
 
+### Carbon Footprint Entities
+
+| Platform | Entity                                                      | Description                                                                                     |
+|:---------|:------------------------------------------------------------|:------------------------------------------------------------------------------------------------|
+| `sensor` | `inpost_[PHONE_NUMBER]_total_carbon_footprint`              | Total cumulative CO₂ in kg from all delivered parcels.                                          |
+| `sensor` | `inpost_[PHONE_NUMBER]_today_carbon_footprint`              | CO₂ in kg from parcels picked up today.                                                         |
+| `sensor` | `inpost_[PHONE_NUMBER]_carbon_footprint_statistics`         | Statistics sensor with daily breakdown data for graph visualization (see attributes below).     |
+
+#### Carbon Footprint Statistics Attributes
+
+The `carbon_footprint_statistics` sensor provides the following attributes for advanced visualization:
+
+| Attribute         | Type  | Description                                                              |
+|:------------------|:------|:-------------------------------------------------------------------------|
+| `daily_data`      | list  | List of `{date, value, parcel_count}` objects for daily CO₂ graphs.      |
+| `cumulative_data` | list  | List of `{date, value}` objects for cumulative CO₂ graphs.               |
+| `total_co2_kg`    | float | Total carbon footprint in kilograms.                                     |
+| `total_parcels`   | int   | Total number of delivered parcels counted.                               |
+
+> **How Carbon Footprint is Calculated:**
+> - Only **DELIVERED** parcels are counted
+> - Uses `boxMachineDelivery` value (lower CO₂) if parcel was picked up from a **parcel locker**
+> - Uses `addressDelivery` value (higher CO₂) if parcel was delivered by **courier**
+> - Respects `show_only_own_parcels` configuration setting
+> - Uses `pickUpDate` as the date for statistics
+
 ### Per-Locker Entities
 
 For each configured locker (identified by `[LOCKER_ID]`), the following entities are created:
@@ -206,6 +232,166 @@ For each configured locker (identified by `[LOCKER_ID]`), the following entities
 
 ---
 
+## Carbon Footprint Tracking
+
+The integration tracks the carbon footprint (CO₂ emissions) of your delivered parcels. This helps you understand the environmental impact of your deliveries and encourages the use of parcel lockers, which have a significantly lower carbon footprint compared to home delivery.
+
+![Carbon Footprint card](docs/img/ha-inpost-carbon-footprint-chart.png)
+
+### Data Persistence
+
+> **Important:** Understanding how historical data is stored
+
+Home Assistant provides two ways to access historical data:
+
+1. **Long-Term Statistics (LTS)**: Because the carbon footprint sensors have `state_class` attributes, Home Assistant automatically records hourly statistics that are kept **indefinitely**. This is the recommended way to view historical carbon footprint data.
+
+2. **Sensor Attributes**: The `daily_data` and `cumulative_data` attributes in the statistics sensor are computed from the **current API response**. If InPost removes old parcels from their API (e.g., only returns the last 3 months), these attributes will not include older data.
+
+**Recommendation:** For long-term carbon footprint tracking, use Home Assistant's built-in statistics features (see examples below) rather than relying on sensor attributes.
+
+### Visualization Examples
+
+#### Using Statistics Graph Card (Built-in)
+
+The statistics graph card uses Home Assistant's long-term statistics, which persist even after old data is removed from the API:
+
+```yaml
+type: statistics-graph
+title: Carbon Footprint Over Time
+entities:
+  - sensor.inpost_123456789_total_carbon_footprint
+stat_types:
+  - state
+days_to_show: 180
+```
+
+#### Using History Graph Card (Built-in)
+
+```yaml
+type: history-graph
+title: Daily Carbon Footprint
+entities:
+  - entity: sensor.inpost_123456789_today_carbon_footprint
+hours_to_show: 720  # 30 days
+```
+
+#### Using ApexCharts Card (HACS)
+
+For more advanced visualization, install [ApexCharts Card](https://github.com/RomRider/apexcharts-card) from HACS.
+
+**Daily Carbon Footprint Bar Chart:**
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Daily Carbon Footprint (kg CO₂)
+  show_states: true
+graph_span: 30d
+span:
+  end: day
+series:
+  - entity: sensor.inpost_123456789_carbon_footprint_statistics
+    name: Daily CO₂
+    type: column
+    data_generator: |
+      return entity.attributes.daily_data.map(d => {
+        return [new Date(d.date).getTime(), d.value];
+      });
+```
+
+**Cumulative Carbon Footprint Line Chart:**
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Cumulative Carbon Footprint (kg CO₂)
+  show_states: true
+graph_span: 90d
+series:
+  - entity: sensor.inpost_123456789_carbon_footprint_statistics
+    name: Total CO₂
+    type: area
+    curve: smooth
+    data_generator: |
+      return entity.attributes.cumulative_data.map(d => {
+        return [new Date(d.date).getTime(), d.value];
+      });
+apex_config:
+  fill:
+    type: gradient
+    gradient:
+      shadeIntensity: 0.8
+      opacityFrom: 0.7
+      opacityTo: 0.3
+```
+
+**Combined Daily and Cumulative Chart:**
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Carbon Footprint Analysis
+graph_span: 30d
+yaxis:
+  - id: daily
+    opposite: false
+    decimals: 3
+    apex_config:
+      title:
+        text: Daily (kg)
+  - id: cumulative
+    opposite: true
+    decimals: 2
+    apex_config:
+      title:
+        text: Cumulative (kg)
+series:
+  - entity: sensor.inpost_123456789_carbon_footprint_statistics
+    name: Daily
+    type: column
+    yaxis_id: daily
+    data_generator: |
+      return entity.attributes.daily_data.map(d => {
+        return [new Date(d.date).getTime(), d.value];
+      });
+  - entity: sensor.inpost_123456789_carbon_footprint_statistics
+    name: Cumulative
+    type: line
+    yaxis_id: cumulative
+    curve: smooth
+    data_generator: |
+      return entity.attributes.cumulative_data.map(d => {
+        return [new Date(d.date).getTime(), d.value];
+      });
+```
+
+**Using Long-Term Statistics with ApexCharts (Recommended for persistence):**
+
+This method uses Home Assistant's recorded statistics, ensuring data persists even after old parcels are removed from the API:
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Carbon Footprint (Long-Term Statistics)
+graph_span: 6mo
+span:
+  end: day
+series:
+  - entity: sensor.inpost_123456789_total_carbon_footprint
+    name: Total CO₂
+    type: line
+    statistics:
+      type: state
+      period: day
+```
+
+---
+
 ## Features
 
 * Monitor the **total** number of parcels associated with your account (Delivered + En Route + Ready for Pickup).
@@ -213,6 +399,7 @@ For each configured locker (identified by `[LOCKER_ID]`), the following entities
 * Monitor configured lockers:
     * Count of **en route** parcels destined for the locker.
     * Count of parcels **ready for pickup** at the locker.
+* Track **carbon footprint** of delivered parcels with daily and cumulative statistics.
 
 ## Roadmap (in no particular order)
 

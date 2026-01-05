@@ -18,6 +18,7 @@ from custom_components.inpost_paczkomaty.const import (
     DEFAULT_SHOW_ONLY_OWN_PARCELS,
 )
 from custom_components.inpost_paczkomaty.models import (
+    ApiCarbonFootprint,
     ApiParcel,
     ApiPickUpPoint,
     AuthTokens,
@@ -1195,3 +1196,356 @@ class TestApiParcel:
         assert item.code == "689756"
         assert item.phone == "+48123456789"
         assert item.status_desc == "Gotowa do odbioru"
+
+
+# =============================================================================
+# Carbon Footprint Calculation Tests
+# =============================================================================
+
+
+class TestCarbonFootprintCalculation:
+    """Tests for carbon footprint calculation in _build_parcels_summary."""
+
+    def test_carbon_footprint_empty_parcels(self, mock_hass, mock_config_entry):
+        """Test carbon footprint with empty parcels list."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+        result = client._build_parcels_summary([])
+
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.0
+        assert result.carbon_footprint_stats.total_parcels == 0
+        assert result.carbon_footprint_stats.daily_data == []
+
+    def test_carbon_footprint_delivered_parcel_locker(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint for delivered parcel from parcel locker."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T20:45:47.443Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.012
+        assert result.carbon_footprint_stats.total_parcels == 1
+        assert len(result.carbon_footprint_stats.daily_data) == 1
+        assert result.carbon_footprint_stats.daily_data[0].date == "2025-12-02"
+        assert result.carbon_footprint_stats.daily_data[0].value == 0.012
+        assert result.carbon_footprint_stats.daily_data[0].parcel_count == 1
+
+    def test_carbon_footprint_delivered_courier(self, mock_hass, mock_config_entry):
+        """Test carbon footprint for delivered parcel from courier (not parcel locker)."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T20:45:47.443Z",
+                pick_up_point=ApiPickUpPoint(name="WAW001", type=["pop"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert result.carbon_footprint_stats is not None
+        # Should use address_delivery since not a parcel_locker
+        assert result.carbon_footprint_stats.total_co2_kg == 0.320
+        assert result.carbon_footprint_stats.total_parcels == 1
+
+    def test_carbon_footprint_multiple_parcels_same_day(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint aggregates multiple parcels on same day."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.015",
+                    address_delivery="0.250",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.027  # 0.012 + 0.015
+        assert result.carbon_footprint_stats.total_parcels == 2
+        assert len(result.carbon_footprint_stats.daily_data) == 1
+        assert result.carbon_footprint_stats.daily_data[0].date == "2025-12-02"
+        assert result.carbon_footprint_stats.daily_data[0].value == 0.027
+        assert result.carbon_footprint_stats.daily_data[0].parcel_count == 2
+
+    def test_carbon_footprint_multiple_days(self, mock_hass, mock_config_entry):
+        """Test carbon footprint tracks multiple days separately."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-01T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.010",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.020",
+                    address_delivery="0.250",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.030  # 0.010 + 0.020
+        assert result.carbon_footprint_stats.total_parcels == 2
+        assert len(result.carbon_footprint_stats.daily_data) == 2
+
+        # Should be sorted by date
+        assert result.carbon_footprint_stats.daily_data[0].date == "2025-12-01"
+        assert result.carbon_footprint_stats.daily_data[0].value == 0.010
+        assert result.carbon_footprint_stats.daily_data[1].date == "2025-12-02"
+        assert result.carbon_footprint_stats.daily_data[1].value == 0.020
+
+    def test_carbon_footprint_only_delivered_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint only counts DELIVERED parcels."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="READY_TO_PICKUP",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.015",
+                    address_delivery="0.250",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="789",
+                status="OUT_FOR_DELIVERY",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.018",
+                    address_delivery="0.300",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Only the DELIVERED parcel should be counted
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.012
+        assert result.carbon_footprint_stats.total_parcels == 1
+
+    def test_carbon_footprint_skips_parcels_without_data(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint skips parcels without carbon data or pick_up_date."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+            # No carbon_footprint
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=None,
+            ),
+            # No pick_up_date
+            ApiParcel(
+                shipment_number="789",
+                status="DELIVERED",
+                pick_up_date=None,
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.018",
+                    address_delivery="0.300",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Only first parcel should be counted
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.012
+        assert result.carbon_footprint_stats.total_parcels == 1
+
+    def test_carbon_footprint_respects_show_only_own_parcels(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint respects show_only_own_parcels setting."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=True
+        )
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                ownership_status="OWN",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                ownership_status="FRIEND",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.015",
+                    address_delivery="0.250",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Only OWN parcel should be counted
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.012
+        assert result.carbon_footprint_stats.total_parcels == 1
+
+    def test_carbon_footprint_includes_friend_parcels_by_default(
+        self, mock_hass, mock_config_entry
+    ):
+        """Test carbon footprint includes FRIEND parcels when show_only_own_parcels is False."""
+        client = InPostApiClient(
+            mock_hass, mock_config_entry, show_only_own_parcels=False
+        )
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                ownership_status="OWN",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.012",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                ownership_status="FRIEND",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.015",
+                    address_delivery="0.250",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Both parcels should be counted
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.027
+        assert result.carbon_footprint_stats.total_parcels == 2
+
+    def test_carbon_footprint_rounding(self, mock_hass, mock_config_entry):
+        """Test carbon footprint total is properly rounded."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        parcels = [
+            ApiParcel(
+                shipment_number="123",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T10:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.0123",
+                    address_delivery="0.320",
+                ),
+            ),
+            ApiParcel(
+                shipment_number="456",
+                status="DELIVERED",
+                pick_up_date="2025-12-02T15:00:00.000Z",
+                pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+                carbon_footprint=ApiCarbonFootprint(
+                    box_machine_delivery="0.0156",
+                    address_delivery="0.250",
+                ),
+            ),
+        ]
+
+        result = client._build_parcels_summary(parcels)
+
+        # Total should be rounded to 4 decimal places
+        assert result.carbon_footprint_stats is not None
+        assert result.carbon_footprint_stats.total_co2_kg == 0.0279

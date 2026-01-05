@@ -1,6 +1,7 @@
 """Data models for InPost Paczkomaty integration."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .exceptions import parse_api_error
@@ -43,6 +44,7 @@ class ParcelsSummary:
     en_route_count: int
     ready_for_pickup: Dict[str, Locker]
     en_route: Dict[str, Locker]
+    carbon_footprint_stats: Optional["CarbonFootprintStats"] = None
 
 
 @dataclass
@@ -129,6 +131,25 @@ class ApiPickUpPoint:
     image_url: Optional[str] = None
     point_type: Optional[str] = None
     easy_access_zone: bool = False
+    type: Optional[List[str]] = None  # e.g., ["parcel_locker"]
+
+    @property
+    def is_parcel_locker(self) -> bool:
+        """Check if this pickup point is a parcel locker."""
+        if self.type:
+            return "parcel_locker" in self.type
+        return False
+
+
+@dataclass
+class ApiCarbonFootprint:
+    """Carbon footprint data from InPost API."""
+
+    box_machine_delivery: Optional[str] = None  # CO2 in kg for locker delivery
+    address_delivery: Optional[str] = None  # CO2 in kg for courier delivery
+    change_delivery_type_percent: Optional[str] = None
+    change_delivery_type_value: Optional[str] = None
+    redirection_url: Optional[str] = None
 
 
 @dataclass
@@ -172,6 +193,7 @@ class ApiParcel:
     receiver: Optional[ApiReceiver] = None
     sender: Optional[ApiSender] = None
     ownership_status: Optional[str] = None
+    carbon_footprint: Optional[ApiCarbonFootprint] = None
 
     @property
     def locker_id(self) -> Optional[str]:
@@ -215,6 +237,48 @@ class ApiParcel:
             status_desc=self.status_description,
         )
 
+    @property
+    def effective_carbon_footprint(self) -> Optional[float]:
+        """Get the effective carbon footprint based on pickup point type.
+
+        Uses boxMachineDelivery if pickup point is a parcel locker,
+        otherwise uses addressDelivery.
+
+        Returns:
+            Carbon footprint value in kg CO2 or None if not available.
+        """
+        if not self.carbon_footprint:
+            return None
+
+        # Use parcel locker value if pickup point is a parcel locker
+        if self.pick_up_point and self.pick_up_point.is_parcel_locker:
+            value = self.carbon_footprint.box_machine_delivery
+        else:
+            value = self.carbon_footprint.address_delivery
+
+        if value:
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    @property
+    def pick_up_date_parsed(self) -> Optional[datetime]:
+        """Parse pick_up_date string to datetime object.
+
+        Returns:
+            Datetime object or None if not available or invalid.
+        """
+        if not self.pick_up_date:
+            return None
+        try:
+            # Handle ISO format with Z suffix
+            date_str = self.pick_up_date.replace("Z", "+00:00")
+            return datetime.fromisoformat(date_str)
+        except (ValueError, TypeError):
+            return None
+
 
 @dataclass
 class TrackedParcelsResponse:
@@ -223,6 +287,29 @@ class TrackedParcelsResponse:
     updated_until: str
     more: bool
     parcels: List[ApiParcel] = field(default_factory=list)
+
+
+@dataclass
+class DailyCarbonFootprint:
+    """Daily carbon footprint data for statistics."""
+
+    date: str  # Date in YYYY-MM-DD format
+    value: float  # CO2 in kg
+    parcel_count: int  # Number of parcels for this day
+
+
+@dataclass
+class CarbonFootprintStats:
+    """Carbon footprint statistics for parcels."""
+
+    total_co2_kg: float  # Total cumulative CO2 in kg
+    total_parcels: int  # Total number of delivered parcels counted
+    daily_data: List[DailyCarbonFootprint]  # Daily breakdown for graphs
+
+    @property
+    def total_co2_grams(self) -> float:
+        """Get total CO2 in grams."""
+        return self.total_co2_kg * 1000
 
 
 # Status constants for parcel filtering

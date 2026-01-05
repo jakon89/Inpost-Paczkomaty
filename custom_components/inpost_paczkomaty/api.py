@@ -22,6 +22,7 @@ from custom_components.inpost_paczkomaty.exceptions import ApiClientError
 from custom_components.inpost_paczkomaty.http_client import HttpClient
 from custom_components.inpost_paczkomaty.models import (
     ApiAddressDetails,
+    ApiCarbonFootprint,
     ApiLocation,
     ApiParcel,
     ApiPhoneNumber,
@@ -29,6 +30,8 @@ from custom_components.inpost_paczkomaty.models import (
     ApiReceiver,
     ApiSender,
     AuthTokens,
+    CarbonFootprintStats,
+    DailyCarbonFootprint,
     EN_ROUTE_STATUSES,
     InPostParcelLocker,
     Locker,
@@ -238,6 +241,9 @@ class InPostApiClient:
                 ApiPhoneNumber: lambda d: from_dict(ApiPhoneNumber, d, config=Config()),
                 ApiReceiver: lambda d: from_dict(ApiReceiver, d, config=Config()),
                 ApiSender: lambda d: from_dict(ApiSender, d, config=Config()),
+                ApiCarbonFootprint: lambda d: from_dict(
+                    ApiCarbonFootprint, d, config=Config()
+                ),
             }
         )
         tracked_response = from_dict(
@@ -355,6 +361,11 @@ class InPostApiClient:
         ready_count = 0
         en_route_count = 0
 
+        # Carbon footprint tracking
+        daily_co2: Dict[str, Dict[str, float]] = {}  # {date: {co2, count}}
+        total_co2 = 0.0
+        total_delivered_parcels = 0
+
         for parcel in parcels:
             # Skip shared parcels if show_only_own_parcels is enabled
             if self._show_only_own_parcels and parcel.ownership_status != "OWN":
@@ -383,12 +394,43 @@ class InPostApiClient:
                 en_route[locker_id].parcels.append(parcel.to_parcel_item())
                 en_route[locker_id].count += 1
 
+            # Calculate carbon footprint for DELIVERED parcels
+            if parcel.status == "DELIVERED":
+                co2_value = parcel.effective_carbon_footprint
+                pickup_date = parcel.pick_up_date_parsed
+
+                if co2_value is not None and pickup_date is not None:
+                    date_str = pickup_date.strftime("%Y-%m-%d")
+                    if date_str not in daily_co2:
+                        daily_co2[date_str] = {"co2": 0.0, "count": 0}
+                    daily_co2[date_str]["co2"] += co2_value
+                    daily_co2[date_str]["count"] += 1
+                    total_co2 += co2_value
+                    total_delivered_parcels += 1
+
+        # Build carbon footprint stats
+        daily_data = [
+            DailyCarbonFootprint(
+                date=date_str,
+                value=data["co2"],
+                parcel_count=int(data["count"]),
+            )
+            for date_str, data in sorted(daily_co2.items())
+        ]
+
+        carbon_stats = CarbonFootprintStats(
+            total_co2_kg=round(total_co2, 4),
+            total_parcels=total_delivered_parcels,
+            daily_data=daily_data,
+        )
+
         return ParcelsSummary(
             all_count=len(parcels),
             ready_for_pickup_count=ready_count,
             en_route_count=en_route_count,
             ready_for_pickup=ready_for_pickup,
             en_route=en_route,
+            carbon_footprint_stats=carbon_stats,
         )
 
     async def close(self) -> None:

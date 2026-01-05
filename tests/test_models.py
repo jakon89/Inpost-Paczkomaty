@@ -4,8 +4,13 @@ import pytest
 
 from custom_components.inpost_paczkomaty.exceptions import InPostApiError
 from custom_components.inpost_paczkomaty.models import (
+    ApiCarbonFootprint,
+    ApiParcel,
+    ApiPickUpPoint,
     AuthStep,
     AuthTokens,
+    CarbonFootprintStats,
+    DailyCarbonFootprint,
     HttpResponse,
     InPostParcelLocker,
     InPostParcelLockerPointCoordinates,
@@ -402,3 +407,278 @@ class TestParcelLockerListResponse:
 
         assert response.items == []
         assert response.total_pages == 0
+
+
+# =============================================================================
+# ApiCarbonFootprint Tests
+# =============================================================================
+
+
+class TestApiCarbonFootprint:
+    """Tests for ApiCarbonFootprint dataclass."""
+
+    def test_init_with_defaults(self):
+        """Test initialization with default values."""
+        carbon = ApiCarbonFootprint()
+
+        assert carbon.box_machine_delivery is None
+        assert carbon.address_delivery is None
+        assert carbon.change_delivery_type_percent is None
+        assert carbon.change_delivery_type_value is None
+        assert carbon.redirection_url is None
+
+    def test_init_with_all_values(self):
+        """Test initialization with all values."""
+        carbon = ApiCarbonFootprint(
+            box_machine_delivery="0.012",
+            address_delivery="0.320",
+            change_delivery_type_percent="96.1",
+            change_delivery_type_value="0.308",
+            redirection_url="https://inpost.pl/slad-weglowy",
+        )
+
+        assert carbon.box_machine_delivery == "0.012"
+        assert carbon.address_delivery == "0.320"
+        assert carbon.change_delivery_type_percent == "96.1"
+        assert carbon.change_delivery_type_value == "0.308"
+        assert carbon.redirection_url == "https://inpost.pl/slad-weglowy"
+
+
+# =============================================================================
+# ApiPickUpPoint Tests
+# =============================================================================
+
+
+class TestApiPickUpPoint:
+    """Tests for ApiPickUpPoint dataclass."""
+
+    def test_init_with_defaults(self):
+        """Test initialization with default values."""
+        point = ApiPickUpPoint(name="GDA117M")
+
+        assert point.name == "GDA117M"
+        assert point.location is None
+        assert point.type is None
+        assert point.easy_access_zone is False
+
+    def test_is_parcel_locker_true(self):
+        """Test is_parcel_locker returns True for parcel_locker type."""
+        point = ApiPickUpPoint(name="GDA117M", type=["parcel_locker"])
+        assert point.is_parcel_locker is True
+
+    def test_is_parcel_locker_true_with_multiple_types(self):
+        """Test is_parcel_locker returns True when parcel_locker is in type list."""
+        point = ApiPickUpPoint(
+            name="GDA117M", type=["parcel_locker", "parcel_locker_superpop"]
+        )
+        assert point.is_parcel_locker is True
+
+    def test_is_parcel_locker_false_for_other_type(self):
+        """Test is_parcel_locker returns False for non-parcel_locker types."""
+        point = ApiPickUpPoint(name="WAW001", type=["pop"])
+        assert point.is_parcel_locker is False
+
+    def test_is_parcel_locker_false_when_type_none(self):
+        """Test is_parcel_locker returns False when type is None."""
+        point = ApiPickUpPoint(name="GDA117M", type=None)
+        assert point.is_parcel_locker is False
+
+    def test_is_parcel_locker_false_when_type_empty(self):
+        """Test is_parcel_locker returns False when type is empty list."""
+        point = ApiPickUpPoint(name="GDA117M", type=[])
+        assert point.is_parcel_locker is False
+
+
+# =============================================================================
+# ApiParcel Carbon Footprint Tests
+# =============================================================================
+
+
+class TestApiParcelCarbonFootprint:
+    """Tests for ApiParcel carbon footprint related properties."""
+
+    def test_effective_carbon_footprint_parcel_locker(self):
+        """Test effective_carbon_footprint uses boxMachineDelivery for parcel lockers."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+            carbon_footprint=ApiCarbonFootprint(
+                box_machine_delivery="0.012",
+                address_delivery="0.320",
+            ),
+        )
+
+        assert parcel.effective_carbon_footprint == 0.012
+
+    def test_effective_carbon_footprint_courier(self):
+        """Test effective_carbon_footprint uses addressDelivery for courier delivery."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=ApiPickUpPoint(name="WAW001", type=["pop"]),
+            carbon_footprint=ApiCarbonFootprint(
+                box_machine_delivery="0.012",
+                address_delivery="0.320",
+            ),
+        )
+
+        assert parcel.effective_carbon_footprint == 0.320
+
+    def test_effective_carbon_footprint_no_pickup_point(self):
+        """Test effective_carbon_footprint uses addressDelivery when no pickup point."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=None,
+            carbon_footprint=ApiCarbonFootprint(
+                box_machine_delivery="0.012",
+                address_delivery="0.320",
+            ),
+        )
+
+        assert parcel.effective_carbon_footprint == 0.320
+
+    def test_effective_carbon_footprint_none_when_no_carbon_data(self):
+        """Test effective_carbon_footprint returns None when no carbon data."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+            carbon_footprint=None,
+        )
+
+        assert parcel.effective_carbon_footprint is None
+
+    def test_effective_carbon_footprint_none_when_value_missing(self):
+        """Test effective_carbon_footprint returns None when value is missing."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+            carbon_footprint=ApiCarbonFootprint(
+                box_machine_delivery=None,
+                address_delivery="0.320",
+            ),
+        )
+
+        assert parcel.effective_carbon_footprint is None
+
+    def test_effective_carbon_footprint_invalid_value(self):
+        """Test effective_carbon_footprint returns None for invalid value."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_point=ApiPickUpPoint(name="GDA117M", type=["parcel_locker"]),
+            carbon_footprint=ApiCarbonFootprint(
+                box_machine_delivery="invalid",
+                address_delivery="0.320",
+            ),
+        )
+
+        assert parcel.effective_carbon_footprint is None
+
+    def test_pick_up_date_parsed_valid(self):
+        """Test pick_up_date_parsed with valid ISO date."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_date="2025-12-02T20:45:47.443Z",
+        )
+
+        result = parcel.pick_up_date_parsed
+        assert result is not None
+        assert result.year == 2025
+        assert result.month == 12
+        assert result.day == 2
+        assert result.hour == 20
+        assert result.minute == 45
+
+    def test_pick_up_date_parsed_none_when_no_date(self):
+        """Test pick_up_date_parsed returns None when no date."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_date=None,
+        )
+
+        assert parcel.pick_up_date_parsed is None
+
+    def test_pick_up_date_parsed_invalid_date(self):
+        """Test pick_up_date_parsed returns None for invalid date."""
+        parcel = ApiParcel(
+            shipment_number="123",
+            status="DELIVERED",
+            pick_up_date="invalid-date",
+        )
+
+        assert parcel.pick_up_date_parsed is None
+
+
+# =============================================================================
+# DailyCarbonFootprint Tests
+# =============================================================================
+
+
+class TestDailyCarbonFootprint:
+    """Tests for DailyCarbonFootprint dataclass."""
+
+    def test_init(self):
+        """Test initialization."""
+        daily = DailyCarbonFootprint(
+            date="2025-12-02",
+            value=0.024,
+            parcel_count=2,
+        )
+
+        assert daily.date == "2025-12-02"
+        assert daily.value == 0.024
+        assert daily.parcel_count == 2
+
+
+# =============================================================================
+# CarbonFootprintStats Tests
+# =============================================================================
+
+
+class TestCarbonFootprintStats:
+    """Tests for CarbonFootprintStats dataclass."""
+
+    def test_init(self):
+        """Test initialization."""
+        stats = CarbonFootprintStats(
+            total_co2_kg=0.5,
+            total_parcels=10,
+            daily_data=[],
+        )
+
+        assert stats.total_co2_kg == 0.5
+        assert stats.total_parcels == 10
+        assert stats.daily_data == []
+
+    def test_total_co2_grams(self):
+        """Test total_co2_grams property."""
+        stats = CarbonFootprintStats(
+            total_co2_kg=0.5,
+            total_parcels=10,
+            daily_data=[],
+        )
+
+        assert stats.total_co2_grams == 500.0
+
+    def test_with_daily_data(self):
+        """Test initialization with daily data."""
+        daily_data = [
+            DailyCarbonFootprint(date="2025-12-01", value=0.012, parcel_count=1),
+            DailyCarbonFootprint(date="2025-12-02", value=0.024, parcel_count=2),
+        ]
+
+        stats = CarbonFootprintStats(
+            total_co2_kg=0.036,
+            total_parcels=3,
+            daily_data=daily_data,
+        )
+
+        assert len(stats.daily_data) == 2
+        assert stats.daily_data[0].date == "2025-12-01"
+        assert stats.daily_data[1].value == 0.024
