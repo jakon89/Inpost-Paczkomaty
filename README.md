@@ -31,7 +31,7 @@ Note: Simply re-adding the integration should work for most users. Full removal 
 1. **Authentication:** You provide your **phone number** to the integration setup. You then receive an **SMS code**
    which you also provide. If prompted, verify your email by clicking the link in the email sent to you by InPost (this can be done on any device).
 2. **Data Flow:** Authentication data is stored locally and send only to official InPost servers for authentication purposes. After successful authentication API tokens are stored on you HA instance (refresh token, access token, etc).
-3. **Polling:** Home Assistant polls the InPost API every **30 seconds** to retrieve the latest updates on your
+3. **Polling:** Home Assistant polls the InPost API every **30 seconds** (configurable) to retrieve the latest updates on your
    parcels.
 
 ---
@@ -58,6 +58,74 @@ Note: Simply re-adding the integration should work for most users. Full removal 
    Assistant configuration folder.
 3. **Restart Home Assistant**.
 4. Execute steps **6, 7, and 8** from the HACS installation method above.
+
+---
+
+## Configuration
+
+The integration can be customized via `configuration.yaml`. All options are **optional** and have sensible defaults.
+
+```yaml
+inpost_paczkomaty:
+  update_interval_seconds: 30
+  http_timeout_seconds: 30
+  ignored_en_route_statuses:
+    - CONFIRMED
+  show_only_own_parcels: false
+  parcel_lockers_url: "https://inpost.pl/sites/default/files/points.json"
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|:-------|:-----|:--------|:------------|
+| `update_interval_seconds` | integer | `30` | How often (in seconds) the integration polls the InPost API for updates. |
+| `http_timeout_seconds` | integer | `30` | HTTP request timeout in seconds. Increase if you experience timeout errors. |
+| `ignored_en_route_statuses` | list | `["CONFIRMED"]` | List of parcel statuses to exclude from "en route" counts. See [Available Statuses](#available-en-route-statuses) below. |
+| `show_only_own_parcels` | boolean | `false` | When `true`, only shows parcels you own. When `false`, also shows parcels shared with you by others (e.g., family members). Useful to avoid duplicate counting in multi-user households. |
+| `parcel_lockers_url` | url | `https://inpost.pl/sites/default/files/points.json` | URL for fetching the parcel lockers list. Only change if InPost changes their endpoint or if you want to use custom parcel lockers list. |
+
+### Available En Route Statuses
+
+The following statuses are considered "en route" by default:
+
+| Status | Description |
+|:-------|:------------|
+| `CONFIRMED` | Parcel has been confirmed/created by sender (ignored by default) |
+| `DISPATCHED_BY_SENDER` | Parcel dispatched by sender |
+| `TAKEN_BY_COURIER` | Parcel picked up by courier |
+| `ADOPTED_AT_SOURCE_BRANCH` | Parcel received at source branch |
+| `SENT_FROM_SOURCE_BRANCH` | Parcel sent from source branch |
+| `OUT_FOR_DELIVERY` | Parcel is out for delivery |
+
+By default, `CONFIRMED` is ignored because parcels in this status are often just created but not yet physically handed over to InPost.
+
+**Example:** To ignore both `CONFIRMED` and `DISPATCHED_BY_SENDER`:
+
+```yaml
+inpost_paczkomaty:
+  ignored_en_route_statuses:
+    - CONFIRMED
+    - DISPATCHED_BY_SENDER
+```
+
+**Example:** To show all en route statuses (don't ignore any):
+
+```yaml
+inpost_paczkomaty:
+  ignored_en_route_statuses: []
+```
+
+### Multi-User Households
+
+If multiple family members are configured in HA and share parcels with each other, you might see duplicate parcel counts. Use `show_only_own_parcels: true` to only count parcels that belong to InPost account owner:
+
+```yaml
+inpost_paczkomaty:
+  show_only_own_parcels: true
+```
+
+---
 
 ## Usage Examples
 
