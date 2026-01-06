@@ -399,7 +399,7 @@ class ApiParcel:
 class TrackedParcelsResponse:
     """Response from InPost tracked parcels API."""
 
-    more: bool
+    more: bool = False
     updated_until: Optional[str] = None
     parcels: List[ApiParcel] = field(default_factory=list)
 
