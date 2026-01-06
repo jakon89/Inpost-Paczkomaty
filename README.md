@@ -31,7 +31,7 @@ Note: Simply re-adding the integration should work for most users. Full removal 
 1. **Authentication:** You provide your **phone number** to the integration setup. You then receive an **SMS code**
    which you also provide. If prompted, verify your email by clicking the link in the email sent to you by InPost (this can be done on any device).
 2. **Data Flow:** Authentication data is stored locally and send only to official InPost servers for authentication purposes. After successful authentication API tokens are stored on you HA instance (refresh token, access token, etc).
-3. **Polling:** Home Assistant polls the InPost API every **30 seconds** to retrieve the latest updates on your
+3. **Polling:** Home Assistant polls the InPost API every **30 seconds** (configurable) to retrieve the latest updates on your
    parcels.
 
 ---
@@ -59,6 +59,74 @@ Note: Simply re-adding the integration should work for most users. Full removal 
 3. **Restart Home Assistant**.
 4. Execute steps **6, 7, and 8** from the HACS installation method above.
 
+---
+
+## Configuration
+
+The integration can be customized via `configuration.yaml`. All options are **optional** and have sensible defaults.
+
+```yaml
+inpost_paczkomaty:
+  update_interval_seconds: 30
+  http_timeout_seconds: 30
+  ignored_en_route_statuses:
+    - CONFIRMED
+  show_only_own_parcels: false
+  parcel_lockers_url: "https://inpost.pl/sites/default/files/points.json"
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|:-------|:-----|:--------|:------------|
+| `update_interval_seconds` | integer | `30` | How often (in seconds) the integration polls the InPost API for updates. |
+| `http_timeout_seconds` | integer | `30` | HTTP request timeout in seconds. Increase if you experience timeout errors. |
+| `ignored_en_route_statuses` | list | `["CONFIRMED"]` | List of parcel statuses to exclude from "en route" counts. See [Available Statuses](#available-en-route-statuses) below. |
+| `show_only_own_parcels` | boolean | `false` | When `true`, only shows parcels you own. When `false`, also shows parcels shared with you by others (e.g., family members). Useful to avoid duplicate counting in multi-user households. |
+| `parcel_lockers_url` | url | [InPost points URL](https://inpost.pl/sites/default/files/points.json) | URL for fetching the parcel lockers list. Only change if InPost changes their endpoint or if you want to use custom parcel lockers list. |
+
+### Available En Route Statuses
+
+The following statuses are considered "en route" by default:
+
+| Status | Description |
+|:-------|:------------|
+| `CONFIRMED` | Parcel has been confirmed/created by sender (ignored by default) |
+| `DISPATCHED_BY_SENDER` | Parcel dispatched by sender |
+| `TAKEN_BY_COURIER` | Parcel picked up by courier |
+| `ADOPTED_AT_SOURCE_BRANCH` | Parcel received at source branch |
+| `SENT_FROM_SOURCE_BRANCH` | Parcel sent from source branch |
+| `OUT_FOR_DELIVERY` | Parcel is out for delivery |
+
+By default, `CONFIRMED` is ignored because parcels in this status are often just created but not yet physically handed over to InPost.
+
+**Example:** To ignore both `CONFIRMED` and `DISPATCHED_BY_SENDER`:
+
+```yaml
+inpost_paczkomaty:
+  ignored_en_route_statuses:
+    - CONFIRMED
+    - DISPATCHED_BY_SENDER
+```
+
+**Example:** To show all en route statuses (don't ignore any):
+
+```yaml
+inpost_paczkomaty:
+  ignored_en_route_statuses: []
+```
+
+### Multi-User Households
+
+If multiple family members are configured in HA and share parcels with each other, you might see duplicate parcel counts. Use `show_only_own_parcels: true` to only count parcels that belong to InPost account owner:
+
+```yaml
+inpost_paczkomaty:
+  show_only_own_parcels: true
+```
+
+---
+
 ## Usage Examples
 
 ### Dashboard panel
@@ -73,6 +141,82 @@ Display parcel counts directly on your Home Assistant dashboard to see at a glan
 # 📦 Parcels waiting: {{ (states('sensor.inpost_123456789_ready_for_pickup_parcels_count') | int) + (states('sensor.inpost_987654321_ready_for_pickup_parcels_count') | int) }}
 ## 🙋‍♀️ Wife: {{ states('sensor.inpost_987654321_ready_for_pickup_parcels_count') }}
 ## 🙋‍♂️ Husband: {{ states('sensor.inpost_123456789_ready_for_pickup_parcels_count') }}
+```
+
+#### Advanced Parcels Dashboard with QR Codes
+
+Display detailed parcels information with QR codes for easy pickup using Home Assistant's built-in `<ha-qr-code>` component.
+
+![Parcel dashboacd card](docs/img/parcel-dashboard-example.png)
+
+**Markdown card configuration:**
+
+```yaml
+type: markdown
+content: |
+  {% set parcels_sensor = 'sensor.inpost_123456789_parcels_list' %}
+  {% set ready = state_attr(parcels_sensor, 'ready_for_pickup') or [] %}
+  {% set en_route = state_attr(parcels_sensor, 'en_route') or [] %}
+
+  # 📦 Parcels Dashboard
+
+  ## 🟢 Ready for Pickup ({{ ready | length }})
+
+  {% for p in ready %}
+  ---
+  **{{ p.sender_name or 'Unknown sender' }}** {% if p.parcel_size %}({{ p.parcel_size }}){% endif %}
+
+  📍 **{{ p.pickup_point_name or 'Courier' }}** {% if p.pickup_point_description %}- {{ p.pickup_point_description }}{% endif %}
+
+  {% if p.pickup_point_address %}{{ p.pickup_point_address }}{% endif %}
+
+  {% if p.phone_number %}📱 Phone: **{{ p.phone_number }}**{% endif %}
+
+  {% if p.open_code %}🔑 Code: **{{ p.open_code }}**{% endif %}
+
+  {% if p.qr_code %}<ha-qr-code data="{{ p.qr_code }}" width="150"></ha-qr-code>{% endif %}
+
+  {% endfor %}
+
+  {% if en_route | length > 0 %}
+  ## 🚚 En Route ({{ en_route | length }})
+
+  {% for p in en_route %}
+  ---
+  **{{ p.sender_name or 'Unknown sender' }}** {% if p.parcel_size %}({{ p.parcel_size }}){% endif %}
+
+  📍 {{ p.pickup_point_name or 'Courier delivery' }} {% if p.pickup_point_description %}- {{ p.pickup_point_description }}{% endif %}
+
+  {% if p.phone_number %}📱 Phone: **{{ p.phone_number }}**{% endif %}
+
+  Status: {{ p.status_description }}
+
+  {% endfor %}
+  {% endif %}
+```
+
+**Simpler version without QR codes:**
+
+```yaml
+type: markdown
+content: |
+  {% set parcels_sensor = 'sensor.inpost_123456789_parcels_list' %}
+  {% set ready = state_attr(parcels_sensor, 'ready_for_pickup') or [] %}
+  {% set en_route = state_attr(parcels_sensor, 'en_route') or [] %}
+
+  # 📦 Parcels: {{ ready | length }} ready, {{ en_route | length }} en route
+
+  {% for p in ready %}
+  ---
+  ## 🟢 {{ p.sender_name or 'Unknown' }}
+  📍 {{ p.pickup_point_name }} | 🔑 **{{ p.open_code }}**
+  {% endfor %}
+
+  {% for p in en_route %}
+  ---
+  ## 🚚 {{ p.sender_name or 'Unknown' }}
+  📍 {{ p.pickup_point_name or 'Courier' }} | {{ p.status_description }}
+  {% endfor %}
 ```
 
 #### Parcels ready for pick up notification
@@ -110,6 +254,64 @@ actions:
 mode: single
 ```
 
+### Carbon Footprint Visualization
+
+The integration tracks CO₂ emissions of your delivered parcels. Carbon footprint sensors have `state_class` attributes, so Home Assistant automatically records long-term statistics.
+
+![Carbon Footprint card](docs/img/ha-inpost-carbon-footprint-chart.png)
+
+```yaml
+type: statistics-graph
+title: Carbon Footprint Over Time
+entities:
+  - sensor.inpost_123456789_total_carbon_footprint
+stat_types:
+  - state
+days_to_show: 180
+```
+
+<details>
+<summary>Advanced visualization with ApexCharts Card</summary>
+
+Install [ApexCharts Card](https://github.com/RomRider/apexcharts-card) from HACS for more advanced charts.
+
+**Daily bar chart using sensor attributes:**
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Daily Carbon Footprint (kg CO₂)
+graph_span: 30d
+series:
+  - entity: sensor.inpost_123456789_carbon_footprint_statistics
+    name: Daily CO₂
+    type: column
+    data_generator: |
+      return entity.attributes.daily_data.map(d => {
+        return [new Date(d.date).getTime(), d.value];
+      });
+```
+
+**Using long-term statistics (recommended):**
+
+```yaml
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Carbon Footprint (Long-Term Statistics)
+graph_span: 6mo
+series:
+  - entity: sensor.inpost_123456789_total_carbon_footprint
+    name: Total CO₂
+    type: line
+    statistics:
+      type: state
+      period: day
+```
+
+</details>
+
 ## Entities
 
 The integration creates entities for the overall account (phone number registered in InPost mobile app) and for each tracked parcel locker.
@@ -121,6 +323,66 @@ The integration creates entities for the overall account (phone number registere
 | `sensor` | `inpost_[PHONE_NUMBER]_all_parcels_count`              | Total number of all tracked parcels bound to your phone number(Delivered + En Route + Ready for Pickup). |
 | `sensor` | `inpost_[PHONE_NUMBER]_en_route_parcels_count`         | Number of parcels currently en route to any locker.                                                      |
 | `sensor` | `inpost_[PHONE_NUMBER]_ready_for_pickup_parcels_count` | Number of parcels ready for pickup across all configured lockers.                                        |
+| `sensor` | `inpost_[PHONE_NUMBER]_parcels_list`                   | Parcels list sensor with detailed parcel data for dashboard display (see attributes below).              |
+
+#### Parcels List Sensor Attributes
+
+The `parcels_list` sensor provides detailed parcel information for advanced dashboard cards:
+
+| Attribute                | Type  | Description                                                              |
+|:-------------------------|:------|:-------------------------------------------------------------------------|
+| `ready_for_pickup`       | list  | List of parcels ready for pickup with open codes and QR codes.           |
+| `en_route`               | list  | List of parcels in transit.                                              |
+| `ready_for_pickup_count` | int   | Number of parcels ready for pickup.                                      |
+| `en_route_count`         | int   | Number of parcels en route.                                              |
+
+Each parcel in the list contains:
+
+| Field                      | Description                                                |
+|:---------------------------|:-----------------------------------------------------------|
+| `shipment_number`          | Parcel tracking number.                                    |
+| `sender_name`              | Name of the sender.                                        |
+| `status`                   | Current parcel status.                                     |
+| `status_description`       | Human-readable status description.                         |
+| `shipment_type`            | Type: "parcel" (locker) or "courier".                      |
+| `parcel_size`              | Size: A, B, C, or OTHER.                                   |
+| `phone_number`             | Receiver phone number (e.g., "+48987654321").              |
+| `pickup_point_name`        | Locker code (e.g., "GDA117M") or null for courier.         |
+| `pickup_point_address`     | Formatted address of pickup point.                         |
+| `pickup_point_description` | Location description (e.g., "obiekt mieszkalny").          |
+| `pickup_point_city`        | City of pickup point (e.g., "Gdańsk").                     |
+| `pickup_point_street`      | Street name of pickup point (e.g., "Wieżycka").            |
+| `pickup_point_building`    | Building number of pickup point (e.g., "8").               |
+| `pickup_point_post_code`   | Postal code of pickup point (e.g., "80-180").              |
+| `open_code`                | Code to open the locker (only for ready_to_pickup).        |
+| `qr_code`                  | QR code data string (only for ready_to_pickup).            |
+| `stored_date`              | When parcel was stored in locker (ISO format).             |
+
+### Carbon Footprint Entities
+
+| Platform | Entity                                                      | Description                                                                                     |
+|:---------|:------------------------------------------------------------|:------------------------------------------------------------------------------------------------|
+| `sensor` | `inpost_[PHONE_NUMBER]_total_carbon_footprint`              | Total cumulative CO₂ in kg from all delivered parcels.                                          |
+| `sensor` | `inpost_[PHONE_NUMBER]_today_carbon_footprint`              | CO₂ in kg from parcels picked up today.                                                         |
+| `sensor` | `inpost_[PHONE_NUMBER]_carbon_footprint_statistics`         | Statistics sensor with daily breakdown data for graph visualization (see attributes below).     |
+
+#### Carbon Footprint Statistics Attributes
+
+The `carbon_footprint_statistics` sensor provides the following attributes for advanced visualization:
+
+| Attribute         | Type  | Description                                                              |
+|:------------------|:------|:-------------------------------------------------------------------------|
+| `daily_data`      | list  | List of `{date, value, parcel_count}` objects for daily CO₂ graphs.      |
+| `cumulative_data` | list  | List of `{date, value}` objects for cumulative CO₂ graphs.               |
+| `total_co2_kg`    | float | Total carbon footprint in kilograms.                                     |
+| `total_parcels`   | int   | Total number of delivered parcels counted.                               |
+
+> **How Carbon Footprint is Calculated:**
+> - Only **DELIVERED** parcels are counted
+> - Uses `boxMachineDelivery` value (lower CO₂) if parcel was picked up from a **parcel locker**
+> - Uses `addressDelivery` value (higher CO₂) if parcel was delivered by **courier**
+> - Respects `show_only_own_parcels` configuration setting
+> - Uses `pickUpDate` as the date for statistics
 
 ### Per-Locker Entities
 
@@ -145,11 +407,11 @@ For each configured locker (identified by `[LOCKER_ID]`), the following entities
 * Monitor configured lockers:
     * Count of **en route** parcels destined for the locker.
     * Count of parcels **ready for pickup** at the locker.
+* Track **carbon footprint** of delivered parcels with daily and cumulative statistics.
 
 ## Roadmap (in no particular order)
 
 * Support tracking parcels sent to a parcel locker that **has not been configured** in the initial setup.
-* Expose phone number and access code via a Home Assistant entity or attribute.
 * Add a `inpost_[PHONE_NUMBER]_[LOCKER_ID]_deadline` entity to monitor pickup deadlines for each ready-for-pickup parcel in a locker.
 * Add branding images to https://github.com/home-assistant/brands
 * Add this repository to HACS

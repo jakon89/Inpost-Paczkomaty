@@ -207,13 +207,13 @@ class TestDecodeJwtPayload:
 
     def test_decode_token_with_special_chars(self):
         """Test decoding a token with special characters in payload."""
-        payload = {"name": "Mykola Михайлов", "email": "test@example.com"}
+        payload = {"name": "Jan Kowalski", "email": "test@example.com"}
         token = _create_jwt_token(payload)
 
         result = decode_jwt_payload(token)
 
         assert result is not None
-        assert result["name"] == "Mykola Михайлов"
+        assert result["name"] == "Jan Kowalski"
         assert result["email"] == "test@example.com"
 
     def test_decode_invalid_token_format(self):
@@ -333,7 +333,7 @@ class TestIsTokenExpiringSoon:
             "sub": "0631cf03-38ff-4302-8200-9c47a8ccd680",
             "aud": "inpost-mobile",
             "nbf": int(time.time()),
-            "phone": "575875127",
+            "phone": "123456789",
             "azp": "inpost-mobile",
             "scope": ["openid"],
             "iss": "https://account.inpost-group.com",

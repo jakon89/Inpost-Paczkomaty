@@ -41,6 +41,18 @@ class TestHttpClient:
 
         assert client.headers["User-Agent"] == custom_ua
 
+    def test_init_default_timeout(self):
+        """Test initialization sets default timeout to 30 seconds."""
+        client = HttpClient()
+
+        assert client.default_timeout == 30
+
+    def test_init_with_custom_timeout(self):
+        """Test initialization with custom timeout."""
+        client = HttpClient(default_timeout=60)
+
+        assert client.default_timeout == 60
+
     def test_update_headers(self):
         """Test update_headers method."""
         client = HttpClient()

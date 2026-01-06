@@ -9,3 +9,4 @@ __pycache__/
 .coverage
 coverage.xml
 report.json
+.DS_Store

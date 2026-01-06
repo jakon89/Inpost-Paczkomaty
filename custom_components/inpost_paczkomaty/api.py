@@ -11,6 +11,10 @@ from custom_components.inpost_paczkomaty.const import (
     API_BASE_URL,
     CONF_ACCESS_TOKEN,
     CONF_REFRESH_TOKEN,
+    DEFAULT_HTTP_TIMEOUT,
+    DEFAULT_IGNORED_EN_ROUTE_STATUSES,
+    DEFAULT_PARCEL_LOCKERS_URL,
+    DEFAULT_SHOW_ONLY_OWN_PARCELS,
     OAUTH_CLIENT_ID,
     API_USER_AGENT,
 )
@@ -18,6 +22,7 @@ from custom_components.inpost_paczkomaty.exceptions import ApiClientError
 from custom_components.inpost_paczkomaty.http_client import HttpClient
 from custom_components.inpost_paczkomaty.models import (
     ApiAddressDetails,
+    ApiCarbonFootprint,
     ApiLocation,
     ApiParcel,
     ApiPhoneNumber,
@@ -25,9 +30,12 @@ from custom_components.inpost_paczkomaty.models import (
     ApiReceiver,
     ApiSender,
     AuthTokens,
+    CarbonFootprintStats,
+    DailyCarbonFootprint,
     EN_ROUTE_STATUSES,
     InPostParcelLocker,
     Locker,
+    ParcelListItem,
     ParcelLockerListResponse,
     ParcelsSummary,
     ProfileDelivery,
@@ -60,7 +68,6 @@ class InPostApiClient:
     PARCELS_ENDPOINT = "/v4/parcels/tracked"
     PROFILE_ENDPOINT = "/izi/app/shopping/v2/profile"
     TOKEN_ENDPOINT = "/global/oauth2/token"
-    PARCEL_LOCKERS_URL = "https://inpost.pl/sites/default/files/points.json"
 
     def __init__(
         self,
@@ -69,6 +76,10 @@ class InPostApiClient:
         access_token: Optional[str] = None,
         refresh_token: Optional[str] = None,
         on_token_refresh: Optional[Callable[[AuthTokens], None]] = None,
+        ignored_en_route_statuses: Optional[List[str]] = None,
+        http_timeout: int = DEFAULT_HTTP_TIMEOUT,
+        parcel_lockers_url: str = DEFAULT_PARCEL_LOCKERS_URL,
+        show_only_own_parcels: bool = DEFAULT_SHOW_ONLY_OWN_PARCELS,
     ) -> None:
         """Initialize the InPost API client.
 
@@ -78,12 +89,23 @@ class InPostApiClient:
             access_token: Optional access token override.
             refresh_token: Optional refresh token override.
             on_token_refresh: Optional callback when token is refreshed.
+            ignored_en_route_statuses: List of en_route statuses to ignore.
+            http_timeout: HTTP request timeout in seconds.
+            parcel_lockers_url: URL for fetching parcel lockers list.
+            show_only_own_parcels: If True, only show parcels with OWN ownership.
         """
+        self._parcel_lockers_url = parcel_lockers_url
+        self._show_only_own_parcels = show_only_own_parcels
         self.hass = hass
         data = entry.data if entry and entry.data else {}
         self._access_token = access_token or data.get(CONF_ACCESS_TOKEN)
         self._refresh_token = refresh_token or data.get(CONF_REFRESH_TOKEN)
         self._on_token_refresh = on_token_refresh
+        self._ignored_en_route_statuses = frozenset(
+            ignored_en_route_statuses
+            if ignored_en_route_statuses is not None
+            else DEFAULT_IGNORED_EN_ROUTE_STATUSES
+        )
 
         # Authenticated client for InPost mobile API
         self._http_client = HttpClient(
@@ -94,13 +116,15 @@ class InPostApiClient:
                 "Content-Type": "application/json",
                 "Accept-Language": get_language_code(hass.config.language),
             },
+            default_timeout=http_timeout,
         )
 
         # Unauthenticated client for public endpoints
         self._public_http_client = HttpClient(
             custom_headers={
                 "Accept": "application/json",
-            }
+            },
+            default_timeout=http_timeout,
         )
 
     async def _ensure_valid_token(self) -> None:
@@ -218,6 +242,9 @@ class InPostApiClient:
                 ApiPhoneNumber: lambda d: from_dict(ApiPhoneNumber, d, config=Config()),
                 ApiReceiver: lambda d: from_dict(ApiReceiver, d, config=Config()),
                 ApiSender: lambda d: from_dict(ApiSender, d, config=Config()),
+                ApiCarbonFootprint: lambda d: from_dict(
+                    ApiCarbonFootprint, d, config=Config()
+                ),
             }
         )
         tracked_response = from_dict(
@@ -300,7 +327,7 @@ class InPostApiClient:
             ApiClientError: If API request fails.
         """
         try:
-            response = await self._public_http_client.get(url=self.PARCEL_LOCKERS_URL)
+            response = await self._public_http_client.get(url=self._parcel_lockers_url)
 
             if response.is_error:
                 _LOGGER.error(
@@ -335,7 +362,20 @@ class InPostApiClient:
         ready_count = 0
         en_route_count = 0
 
+        # Lists for dashboard display
+        ready_for_pickup_list: List[ParcelListItem] = []
+        en_route_list: List[ParcelListItem] = []
+
+        # Carbon footprint tracking
+        daily_co2: Dict[str, Dict[str, float]] = {}  # {date: {co2, count}}
+        total_co2 = 0.0
+        total_delivered_parcels = 0
+
         for parcel in parcels:
+            # Skip shared parcels if show_only_own_parcels is enabled
+            if self._show_only_own_parcels and parcel.ownership_status != "OWN":
+                continue
+
             locker_id = parcel.locker_id or "COURIER"
 
             if parcel.status == "READY_TO_PICKUP":
@@ -346,8 +386,13 @@ class InPostApiClient:
                     )
                 ready_for_pickup[locker_id].parcels.append(parcel.to_parcel_item())
                 ready_for_pickup[locker_id].count += 1
+                # Add to list for dashboard
+                ready_for_pickup_list.append(parcel.to_parcel_list_item())
 
-            elif parcel.status in EN_ROUTE_STATUSES:
+            elif (
+                parcel.status in EN_ROUTE_STATUSES
+                and parcel.status not in self._ignored_en_route_statuses
+            ):
                 en_route_count += 1
                 if locker_id not in en_route:
                     en_route[locker_id] = Locker(
@@ -355,6 +400,38 @@ class InPostApiClient:
                     )
                 en_route[locker_id].parcels.append(parcel.to_parcel_item())
                 en_route[locker_id].count += 1
+                # Add to list for dashboard
+                en_route_list.append(parcel.to_parcel_list_item())
+
+            # Calculate carbon footprint for DELIVERED parcels
+            if parcel.status == "DELIVERED":
+                co2_value = parcel.effective_carbon_footprint
+                pickup_date = parcel.pick_up_date_parsed
+
+                if co2_value is not None and pickup_date is not None:
+                    date_str = pickup_date.strftime("%Y-%m-%d")
+                    if date_str not in daily_co2:
+                        daily_co2[date_str] = {"co2": 0.0, "count": 0}
+                    daily_co2[date_str]["co2"] += co2_value
+                    daily_co2[date_str]["count"] += 1
+                    total_co2 += co2_value
+                    total_delivered_parcels += 1
+
+        # Build carbon footprint stats
+        daily_data = [
+            DailyCarbonFootprint(
+                date=date_str,
+                value=data["co2"],
+                parcel_count=int(data["count"]),
+            )
+            for date_str, data in sorted(daily_co2.items())
+        ]
+
+        carbon_stats = CarbonFootprintStats(
+            total_co2_kg=round(total_co2, 4),
+            total_parcels=total_delivered_parcels,
+            daily_data=daily_data,
+        )
 
         return ParcelsSummary(
             all_count=len(parcels),
@@ -362,6 +439,9 @@ class InPostApiClient:
             en_route_count=en_route_count,
             ready_for_pickup=ready_for_pickup,
             en_route=en_route,
+            carbon_footprint_stats=carbon_stats,
+            ready_for_pickup_list=ready_for_pickup_list,
+            en_route_list=en_route_list,
         )
 
     async def close(self) -> None:

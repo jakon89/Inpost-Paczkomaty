@@ -1,6 +1,13 @@
 import logging
+from datetime import datetime
+from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import UnitOfMass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, ENTRY_PHONE_NUMBER_CONFIG
@@ -36,6 +43,14 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities.append(AllParcelsCount(coordinator, phone_number))
     entities.append(EnRouteParcelsCount(coordinator, phone_number))
     entities.append(ReadyForPickupParcelsCount(coordinator, phone_number))
+
+    # Parcels list sensors for dashboard markdown card
+    entities.append(ParcelsListSensor(coordinator, phone_number))
+
+    # Carbon footprint sensors
+    entities.append(TotalCarbonFootprintSensor(coordinator, phone_number))
+    entities.append(TodayCarbonFootprintSensor(coordinator, phone_number))
+    entities.append(CarbonFootprintStatisticsSensor(coordinator, phone_number))
 
     for locker_id, locker_data in lockers_map.items():
         # Per locker sensor
@@ -162,6 +177,62 @@ class ReadyForPickupParcelsCount(CoordinatorEntity, SensorEntity):
         return self.coordinator.data.ready_for_pickup_count
 
 
+class ParcelsListSensor(CoordinatorEntity, SensorEntity):
+    """Sensor with parcels list for dashboard markdown card display.
+
+    This sensor provides lists of en_route and ready_for_pickup parcels
+    as attributes that can be used with markdown cards with QR code
+    generation via JavaScript.
+    """
+
+    _attr_icon = "mdi:package-variant"
+
+    def __init__(self, coordinator, phone_number):
+        """Initialize the parcels list sensor."""
+        super().__init__(coordinator)
+        self._phone_number = phone_number
+        self._attr_name = f"InPost {self._phone_number} parcels list"
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this sensor."""
+        return f"{DOMAIN}_{self._phone_number}_parcels_list"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return None
+
+    @property
+    def native_value(self) -> int:
+        """Return total active parcels count as state value."""
+        data = self.coordinator.data
+        return data.ready_for_pickup_count + data.en_route_count
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return parcels lists for dashboard display.
+
+        Attributes include:
+        - ready_for_pickup: List of parcels ready for pickup with QR codes
+        - en_route: List of parcels in transit
+        - ready_for_pickup_count: Count of parcels ready for pickup
+        - en_route_count: Count of parcels en route
+        """
+        data = self.coordinator.data
+
+        # Convert ParcelListItem objects to dicts
+        ready_for_pickup = [parcel.to_dict() for parcel in data.ready_for_pickup_list]
+        en_route = [parcel.to_dict() for parcel in data.en_route_list]
+
+        return {
+            "ready_for_pickup": ready_for_pickup,
+            "en_route": en_route,
+            "ready_for_pickup_count": data.ready_for_pickup_count,
+            "en_route_count": data.en_route_count,
+        }
+
+
 class ParcelLockerDeviceSensor(CoordinatorEntity):
     """Base class for all parcel locker sensors."""
 
@@ -251,3 +322,192 @@ class ParcelLockerAddressSensor(ParcelLockerDeviceSensor, SensorEntity):
     @property
     def native_value(self):
         return f"{self._city}, {self._zip_code}, {self._street} {self._building}"
+
+
+# =============================================================================
+# Carbon Footprint Sensors
+# =============================================================================
+
+
+class TotalCarbonFootprintSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for total cumulative carbon footprint from delivered parcels."""
+
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_icon = "mdi:molecule-co2"
+
+    def __init__(self, coordinator, phone_number):
+        """Initialize the total carbon footprint sensor."""
+        super().__init__(coordinator)
+        self._phone_number = phone_number
+        self._attr_name = f"InPost {self._phone_number} total carbon footprint"
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this sensor."""
+        return f"{DOMAIN}_{self._phone_number}_total_carbon_footprint"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return None
+
+    @property
+    def native_value(self) -> float:
+        """Return the total carbon footprint in kg."""
+        stats = self.coordinator.data.carbon_footprint_stats
+        if stats:
+            return stats.total_co2_kg
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        stats = self.coordinator.data.carbon_footprint_stats
+        if stats:
+            return {
+                "total_parcels": stats.total_parcels,
+                "total_co2_grams": stats.total_co2_grams,
+                "unit_of_measurement": "kg CO₂",
+            }
+        return {}
+
+
+class TodayCarbonFootprintSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for today's carbon footprint from delivered parcels."""
+
+    _attr_device_class = SensorDeviceClass.WEIGHT
+    _attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:molecule-co2"
+
+    def __init__(self, coordinator, phone_number):
+        """Initialize today's carbon footprint sensor."""
+        super().__init__(coordinator)
+        self._phone_number = phone_number
+        self._attr_name = f"InPost {self._phone_number} today carbon footprint"
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this sensor."""
+        return f"{DOMAIN}_{self._phone_number}_today_carbon_footprint"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return None
+
+    @property
+    def native_value(self) -> float:
+        """Return today's carbon footprint in kg."""
+        stats = self.coordinator.data.carbon_footprint_stats
+        if not stats or not stats.daily_data:
+            return 0.0
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        for daily in stats.daily_data:
+            if daily.date == today:
+                return round(daily.value, 4)
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional attributes."""
+        stats = self.coordinator.data.carbon_footprint_stats
+        if not stats or not stats.daily_data:
+            return {}
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        for daily in stats.daily_data:
+            if daily.date == today:
+                return {
+                    "parcel_count": daily.parcel_count,
+                    "date": daily.date,
+                    "unit_of_measurement": "kg CO₂",
+                }
+        return {"parcel_count": 0, "date": today}
+
+
+class CarbonFootprintStatisticsSensor(CoordinatorEntity, SensorEntity):
+    """Sensor with daily carbon footprint statistics for graph visualization.
+
+    This sensor provides daily breakdown data as attributes that can be used
+    with ApexCharts, mini-graph-card, or other visualization cards.
+    """
+
+    _attr_icon = "mdi:chart-line"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
+
+    def __init__(self, coordinator, phone_number):
+        """Initialize the carbon footprint statistics sensor."""
+        super().__init__(coordinator)
+        self._phone_number = phone_number
+        self._attr_name = f"InPost {self._phone_number} carbon footprint statistics"
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this sensor."""
+        return f"{DOMAIN}_{self._phone_number}_carbon_footprint_statistics"
+
+    @property
+    def device_info(self):
+        """Return device info."""
+        return None
+
+    @property
+    def native_value(self) -> float:
+        """Return the total carbon footprint as state value."""
+        stats = self.coordinator.data.carbon_footprint_stats
+        if stats:
+            return stats.total_co2_kg
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return daily statistics and cumulative data for graphs.
+
+        Attributes include:
+        - daily_data: List of {date, value, parcel_count} for daily graphs
+        - cumulative_data: List of {date, value} for cumulative graphs
+        - total_co2_kg: Total carbon footprint
+        - total_parcels: Total number of delivered parcels
+        """
+        stats = self.coordinator.data.carbon_footprint_stats
+        if not stats:
+            return {
+                "daily_data": [],
+                "cumulative_data": [],
+                "total_co2_kg": 0.0,
+                "total_parcels": 0,
+            }
+
+        # Build daily data list
+        daily_data = [
+            {
+                "date": d.date,
+                "value": round(d.value, 4),
+                "parcel_count": d.parcel_count,
+            }
+            for d in stats.daily_data
+        ]
+
+        # Build cumulative data list
+        cumulative_value = 0.0
+        cumulative_data = []
+        for d in stats.daily_data:
+            cumulative_value += d.value
+            cumulative_data.append(
+                {
+                    "date": d.date,
+                    "value": round(cumulative_value, 4),
+                }
+            )
+
+        return {
+            "daily_data": daily_data,
+            "cumulative_data": cumulative_data,
+            "total_co2_kg": stats.total_co2_kg,
+            "total_parcels": stats.total_parcels,
+        }
