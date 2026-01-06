@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.3.0...v0.4.0) (2026-01-06)
+
+
+### Features
+
+* New ParcelsListSensor providing rich parcel data + Carbon Footprint Tracking + (New) Configuration Options ([33b1a9c](https://github.com/jakon89/Inpost-Paczkomaty/commit/33b1a9c03a062fe01286c9d0eabe2b13193058db))
+
 # [0.3.0](https://github.com/jakon89/Inpost-Paczkomaty/compare/v0.2.0...v0.3.0) (2026-01-04)
 
 
