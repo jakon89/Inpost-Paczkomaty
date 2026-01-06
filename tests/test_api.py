@@ -118,7 +118,61 @@ def sample_api_response():
     """Sample InPost API response data."""
     return {
         "updatedUntil": "2025-12-30T08:42:55.488Z",
-        "more": False,
+        "parcels": [
+            {
+                "shipmentNumber": "695080086580180027785172",
+                "shipmentType": "parcel",
+                "openCode": "689756",
+                "status": "READY_TO_PICKUP",
+                "pickUpPoint": {
+                    "name": "GDA117M",
+                    "location": {"latitude": 54.3188, "longitude": 18.58508},
+                    "addressDetails": {
+                        "postCode": "80-180",
+                        "city": "Gdańsk",
+                    },
+                },
+                "receiver": {
+                    "phoneNumber": {"prefix": "+48", "value": "123456789"},
+                    "email": "test@example.com",
+                    "name": "Test User",
+                },
+                "sender": {"name": "Test Sender"},
+            },
+            {
+                "shipmentNumber": "520113012280180076018438",
+                "shipmentType": "courier",
+                "status": "OUT_FOR_DELIVERY",
+                "pickUpPoint": None,
+                "receiver": {
+                    "phoneNumber": {"prefix": "+48", "value": "987654321"},
+                },
+                "sender": {"name": "Amazon"},
+            },
+            {
+                "shipmentNumber": "620999567280180432895075",
+                "shipmentType": "parcel",
+                "status": "CONFIRMED",
+                "pickUpPoint": {
+                    "name": "GDA08M",
+                },
+            },
+            {
+                "shipmentNumber": "111111111111111111111111",
+                "shipmentType": "parcel",
+                "status": "DELIVERED",
+                "pickUpPoint": {"name": "GDA117M"},
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def sample_api_response_with_more_field():
+    """Sample InPost API response data with optional "more" field."""
+    return {
+        "updatedUntil": "2025-12-30T08:42:55.488Z",
+        "more": True,
         "parcels": [
             {
                 "shipmentNumber": "695080086580180027785172",
@@ -348,6 +402,34 @@ class TestInPostApiClient:
 
         mock_response = HttpResponse(
             body=sample_api_response,
+            status=200,
+        )
+
+        with patch.object(
+            client._http_client, "get", new_callable=AsyncMock
+        ) as mock_get:
+            mock_get.return_value = mock_response
+
+            result = await client.get_parcels()
+
+            assert isinstance(result, ParcelsSummary)
+            assert result.all_count == 4
+            assert result.ready_for_pickup_count == 1
+            assert (
+                result.en_route_count == 1
+            )  # OUT_FOR_DELIVERY (CONFIRMED ignored by default)
+            assert "GDA117M" in result.ready_for_pickup
+            assert result.ready_for_pickup["GDA117M"].count == 1
+
+    @pytest.mark.asyncio
+    async def test_get_parcels_success_with_more_field_in_the_response(
+        self, mock_hass, mock_config_entry, sample_api_response_with_more_field
+    ):
+        """Test successful parcels retrieval."""
+        client = InPostApiClient(mock_hass, mock_config_entry)
+
+        mock_response = HttpResponse(
+            body=sample_api_response_with_more_field,
             status=200,
         )
 
